@@ -1,0 +1,24 @@
+{
+  "name": "zones-ai-pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared AI practice pipeline tracker. Azure Functions API and static UI, Cosmos DB storage.",
+  "type": "module",
+  "main": "src/functions/*.js",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "func start",
+    "dev": "node dev/server.mjs",
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "seed:sample": "node scripts/seed-sample.mjs",
+    "import": "node scripts/import-from-excel.mjs"
+  },
+  "dependencies": {
+    "@azure/cosmos": "^4.10.1",
+    "@azure/functions": "^4.16.5",
+    "@azure/identity": "^4.13.3",
+    "exceljs": "^4.4.0"
+  }
+}

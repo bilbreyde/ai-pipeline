@@ -1,0 +1,10 @@
+.git*
+.deploy
+infra
+scripts
+test
+dev
+*.md
+*.ps1
+local.settings.json
+.env.deploy

@@ -1,0 +1,9 @@
+node_modules/
+.deploy/
+.env.deploy
+local.settings.json
+*.zip
+# Never commit customer data. The importer reads your workbook from outside the repo.
+*.xlsx
+*.xls
+*.csv

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Practice Pipeline</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="app">
+  <div class="banner" id="banner" role="alert" hidden></div>
+  <div class="top">
+    <div>
+      <p class="eyebrow">Zones AI Innovation Group</p>
+      <h1>AI Practice Pipeline<span class="beta">Beta</span></h1>
+      <p class="sub">Opportunities with Thoughtworks. Changes save as you make them and show up for everyone within seconds.</p>
+    </div>
+    <div class="top-actions">
+      <span class="sync" id="sync" data-state="wait"><i></i><span id="syncTxt">Connecting</span></span>
+      <button class="btn" id="importBtn" type="button">Import</button>
+      <button class="btn" id="exportBtn" type="button">Export</button>
+      <button class="btn primary" id="addBtn" type="button">Add opportunity</button>
+    </div>
+  </div>
+
+  <section class="band" id="band" aria-label="Pipeline summary"></section>
+
+  <section class="insights">
+    <div class="panel"><h2>Estimated margin by stage</h2><div class="bars" id="stageBars"></div></div>
+    <div class="panel"><h2>Where the margin sits</h2><div class="bars" id="concBars"></div><div id="concAlert"></div></div>
+  </section>
+
+  <details class="assump" id="assump">
+    <summary><span>Assumptions</span><small id="assumpSum">Every margin figure on this page comes from these</small></summary>
+    <div class="assump-body">
+      <div>
+        <h3>How margin is calculated</h3>
+        <label class="radio"><input type="radio" name="basis" value="price" id="basisPrice"><span>Deal size is the sell price<small>Margin = size × GM%. This is how the hand entered margins on the original sheet were built.</small></span></label>
+        <label class="radio"><input type="radio" name="basis" value="cost" id="basisCost"><span>Deal size is our cost<small>Margin = size ÷ (1 − GM%) − size. This is what the formula rows on the original sheet did, and it is 43% higher at 30% GM.</small></span></label>
+        <div class="inline-num"><label for="defGm">Default GM%</label><input type="number" id="defGm" min="1" max="90" step="1"></div>
+        <p class="hint">A row can override the default with its own GM%. Set one on any resale heavy deal.</p>
+      </div>
+      <div>
+        <h3>Win probability by stage</h3>
+        <div class="probs" id="probs"></div>
+        <p class="hint">Used only for the weighted margin. These are starting guesses, so replace them with your own close rates.</p>
+      </div>
+    </div>
+  </details>
+
+  <section>
+    <div class="toolbar" role="search">
+      <input type="search" id="q" placeholder="Search account, seller, next step" aria-label="Search opportunities">
+      <select id="fStage" aria-label="Stage filter"></select>
+      <select id="fLead" aria-label="Lead filter"></select>
+      <select id="fSeg" aria-label="Segment filter"></select>
+      <label class="check"><input type="checkbox" id="fGaps"> Data gaps only</label>
+      <span class="count" id="count"></span>
+    </div>
+  </section>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr id="thead"></tr></thead>
+      <tbody id="tbody"></tbody>
+      <tfoot id="tfoot"></tfoot>
+    </table>
+  </div>
+</div>
+
+<div id="scrim" hidden></div>
+<aside id="drawer" role="dialog" aria-modal="true" aria-labelledby="dtitle" hidden>
+  <header><h2 id="dtitle">Opportunity</h2><button class="x" id="dclose" type="button" aria-label="Close">&times;</button></header>
+  <form id="dform" autocomplete="off">
+    <label class="full">Account<input type="text" id="f-account" required></label>
+    <label class="full">Opportunity<textarea id="f-opp"></textarea></label>
+    <label>Stage<select id="f-stage"></select></label>
+    <label>Segment<select id="f-segment"></select></label>
+    <label>Lead<select id="f-lead"></select></label>
+    <label>Seller<input type="text" id="f-seller" list="sellers"></label>
+    <label>Thoughtworks<select id="f-tw"></select></label>
+    <label>Expected close<input type="date" id="f-close"></label>
+    <label>Deal size<input type="text" id="f-size" inputmode="decimal" placeholder="e.g. 250000 or 250k"></label>
+    <label>GM% override<input type="number" id="f-gm" min="1" max="90" step="1" placeholder="Default"></label>
+    <div class="full preview" id="preview"></div>
+    <label class="full">Next step<textarea id="f-next"></textarea></label>
+    <label class="full">Notes<textarea id="f-notes"></textarea></label>
+  </form>
+  <datalist id="sellers"></datalist>
+  <div class="dfoot">
+    <button class="btn primary" id="dsave" type="button">Save</button>
+    <button class="btn" id="dcancel" type="button">Cancel</button>
+    <span class="grow" id="dmeta"></span>
+    <button class="btn danger" id="ddel" type="button">Delete</button>
+  </div>
+</aside>
+<div id="iscrim" hidden></div>
+<section id="imodal" role="dialog" aria-modal="true" aria-labelledby="imTitle" hidden>
+  <header><h2 id="imTitle">Import from spreadsheet</h2><button class="x" id="imClose" type="button" aria-label="Close">&times;</button></header>
+  <div class="im-body">
+    <p class="hint im-lead">Choose an .xlsx file. Two layouts are recognised: a file exported from this page, and the original AI Practice Progress Sheet. You will see what would change before anything is saved. Import never deletes a row.</p>
+    <label class="im-file"><span>Spreadsheet (.xlsx, up to 4 MB)</span><input type="file" id="imFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+    <div id="imResult" aria-live="polite"></div>
+  </div>
+  <div class="dfoot">
+    <button class="btn primary" id="imGo" type="button" disabled>Import</button>
+    <button class="btn" id="imCancel" type="button">Cancel</button>
+    <span class="grow" id="imMeta"></span>
+  </div>
+</section>
+<div id="toast" role="status" hidden></div>
+<noscript><p style="padding:24px;font-family:sans-serif">This tracker needs JavaScript. Turn it on for this site and reload.</p></noscript>
+<script src="app.js" defer></script>
+</body>
+</html>
