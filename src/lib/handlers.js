@@ -20,6 +20,9 @@ const STATIC_FILES = {
   "": { file: "index.html", type: "text/html; charset=utf-8" },
   "index.html": { file: "index.html", type: "text/html; charset=utf-8" },
   "app.js": { file: "app.js", type: "text/javascript; charset=utf-8" },
+  "theme.js": { file: "theme.js", type: "text/javascript; charset=utf-8" },
+  "dash-calc.js": { file: "dash-calc.js", type: "text/javascript; charset=utf-8" },
+  "dash.js": { file: "dash.js", type: "text/javascript; charset=utf-8" },
   "app.css": { file: "app.css", type: "text/css; charset=utf-8" },
 };
 

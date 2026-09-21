@@ -6,6 +6,7 @@
 <title>AI Practice Pipeline</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="app.css">
+<script src="theme.js"></script>
 </head>
 <body>
 <div class="app">
@@ -17,6 +18,10 @@
       <p class="sub">Opportunities with Thoughtworks. Changes save as you make them and show up for everyone within seconds.</p>
     </div>
     <div class="top-actions">
+      <label class="theme-pick"><span class="sr">Color theme</span><select id="themeSel" aria-label="Color theme">
+        <option value="auto">Theme: System</option><option value="light">Theme: Light</option><option value="dark">Theme: Dark</option>
+        <option value="warm">Theme: Warm, low glare</option><option value="contrast">Theme: High contrast</option>
+      </select></label>
       <span class="sync" id="sync" data-state="wait"><i></i><span id="syncTxt">Connecting</span></span>
       <button class="btn" id="importBtn" type="button">Import</button>
       <button class="btn" id="exportBtn" type="button">Export</button>
@@ -24,6 +29,12 @@
     </div>
   </div>
 
+  <div class="tabs" role="tablist" aria-label="Views">
+    <button class="tab" role="tab" id="tabPipeline" aria-controls="view-pipeline" aria-selected="true" type="button">Pipeline</button>
+    <button class="tab" role="tab" id="tabDash" aria-controls="view-dash" aria-selected="false" tabindex="-1" type="button">Dashboard</button>
+  </div>
+
+<div id="view-pipeline" role="tabpanel" aria-labelledby="tabPipeline" class="view">
   <section class="band" id="band" aria-label="Pipeline summary"></section>
 
   <section class="insights">
@@ -69,6 +80,26 @@
   </div>
 </div>
 
+<div id="view-dash" role="tabpanel" aria-labelledby="tabDash" class="view" hidden>
+  <div class="dash-filters" id="dashFilters">
+    <div class="fgroup"><span class="flabel" id="dMeasureL">Measure</span>
+      <div class="seg" id="dMeasure" role="radiogroup" aria-labelledby="dMeasureL">
+        <button type="button" role="radio" data-m="margin" aria-checked="true">Estimated margin</button>
+        <button type="button" role="radio" data-m="weighted" aria-checked="false" tabindex="-1">Weighted margin</button>
+        <button type="button" role="radio" data-m="size" aria-checked="false" tabindex="-1">Deal size</button>
+      </div>
+    </div>
+    <label class="fgroup"><span class="flabel">Lead</span>
+      <select id="dLead"><option value="">Any lead</option><option>Zones</option><option>Thoughtworks</option><option value="_none">No lead set</option></select>
+    </label>
+    <label class="fgroup"><span class="flabel">Segment</span><select id="dSeg"><option value="">Any segment</option></select></label>
+    <span class="count" id="dScope"></span>
+  </div>
+  <section class="kpis" id="dashKpis" aria-label="Headline numbers"></section>
+  <div class="dash-grid" id="dashGrid"></div>
+</div>
+</div>
+
 <div id="scrim" hidden></div>
 <aside id="drawer" role="dialog" aria-modal="true" aria-labelledby="dtitle" hidden>
   <header><h2 id="dtitle">Opportunity</h2><button class="x" id="dclose" type="button" aria-label="Close">&times;</button></header>
@@ -110,7 +141,13 @@
   </div>
 </section>
 <div id="toast" role="status" hidden></div>
+<svg class="defs" aria-hidden="true" focusable="false"><defs>
+  <pattern id="tx-c1" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" class="pt-c1"/><rect width="3" height="8" class="pt-line"/></pattern>
+  <pattern id="tx-c2" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(135)"><rect width="8" height="8" class="pt-c2"/><rect width="3" height="8" class="pt-line"/></pattern>
+</defs></svg>
 <noscript><p style="padding:24px;font-family:sans-serif">This tracker needs JavaScript. Turn it on for this site and reload.</p></noscript>
+<script src="dash-calc.js" defer></script>
+<script src="dash.js" defer></script>
 <script src="app.js" defer></script>
 </body>
 </html>

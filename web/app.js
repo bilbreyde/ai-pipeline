@@ -11,14 +11,15 @@ var COLS=[
   {k:"size",l:"Deal size",num:1},{k:"margin",l:"Est. margin",num:1},{k:"weighted",l:"Weighted",num:1},
   {k:"next",l:"Next step",ns:1},{k:"close",l:"Close"},{k:"updated",l:"Updated"}
 ];
-var S={canWrite:true,me:"",bulk:false,loaded:false,offline:false,err:"",opps:[],settings:clone(DEFAULTS),
+var S={canWrite:true,me:"",bulk:false,tab:"pipeline",loaded:false,offline:false,err:"",opps:[],settings:clone(DEFAULTS),
   sort:{k:"margin",d:"desc"},f:{q:"",stage:"all",lead:"",seg:"",gaps:false},editing:null,delArmed:false};
 var chains={};
 
 function $(id){return document.getElementById(id)}
 function clone(o){return JSON.parse(JSON.stringify(o))}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
-function isOpen(o){return OPEN.indexOf(o.stage)>-1}
+var DC=window.DashCalc;
+function isOpen(o){return DC.isOpen(o)}
 function full(n){return n==null?"":"$"+Math.round(n).toLocaleString("en-US")}
 function compact(n){
   if(n==null)return "–";
@@ -32,18 +33,11 @@ function parseMoney(s){
   var m=1; if(/k$/.test(s)){m=1e3;s=s.slice(0,-1)} else if(/m$/.test(s)){m=1e6;s=s.slice(0,-1)}
   var n=parseFloat(s); return isFinite(n)?Math.round(n*m):NaN;
 }
-function gmOf(o){var g=(o.gmPct==null||o.gmPct==="")?S.settings.defaultGm:Number(o.gmPct);return Math.min(90,Math.max(0,g||0))}
-function marginOf(o){
-  if(o.size==null||isNaN(o.size))return null;
-  var g=gmOf(o)/100;
-  return S.settings.marginBasis==="cost"?o.size/(1-g)-o.size:o.size*g;
-}
-function probOf(o){var p=S.settings.probs[o.stage];return (p==null?0:p)/100}
-function weightedOf(o){var m=marginOf(o);return m==null?null:m*probOf(o)}
-function gapsOf(o){
-  if(!isOpen(o))return [];
-  var g=[]; if(o.size==null)g.push("No size"); if(!o.seller)g.push("No seller"); if(!o.nextStep)g.push("No next step"); return g;
-}
+function gmOf(o){return DC.gmOf(o,S.settings)}
+function marginOf(o){return DC.marginOf(o,S.settings)}
+function probOf(o){return DC.probOf(o,S.settings)}
+function weightedOf(o){return DC.weightedOf(o,S.settings)}
+function gapsOf(o){return DC.gapsOf(o)}
 function todayStart(){var d=new Date();d.setHours(0,0,0,0);return d}
 function parseDate(s){if(!s)return null;var d=new Date(s+"T00:00:00");return isNaN(d)?null:d}
 function fmtDate(d){return d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:d.getFullYear()===new Date().getFullYear()?undefined:"numeric"})}
@@ -248,10 +242,34 @@ function syncAssumptions(){
   STAGES.forEach(function(s){put("p-"+STAGES.indexOf(s),st.probs[s]==null?0:st.probs[s])});
   $("assumpSum").textContent=(st.marginBasis==="cost"?"Cost basis":"Sell price basis")+", "+st.defaultGm+"% default GM";
 }
+function renderDash(){
+  if(S.tab!=="dash"||!window.Dash)return;
+  window.Dash.render({opps:S.opps,settings:S.settings,loaded:S.loaded,hooks:{showGaps:showGapRows}});
+}
 function render(skipAssump){
   renderHead();renderBand();renderInsights();renderTable();
   if(!skipAssump)syncAssumptions();
   updateSync();
+  renderDash();
+}
+
+/* ---------- tabs ---------- */
+function setTab(t,focus){
+  S.tab=t==="dash"?"dash":"pipeline";
+  var dash=S.tab==="dash";
+  $("view-pipeline").hidden=dash;$("view-dash").hidden=!dash;
+  [["tabPipeline",!dash],["tabDash",dash]].forEach(function(x){
+    var b=$(x[0]);b.setAttribute("aria-selected",String(x[1]));b.tabIndex=x[1]?0:-1;
+    if(focus&&x[1])b.focus();
+  });
+  try{history.replaceState(null,"",dash?"#dashboard":location.pathname+location.search)}catch(e){}
+  if(dash)renderDash();
+}
+function showGapRows(){
+  S.f.gaps=true;S.f.stage="open";
+  $("fGaps").checked=true;$("fStage").value="open";
+  setTab("pipeline");renderTable();
+  window.scrollTo(0,0);
 }
 function updateSync(){
   var el=$("sync"),t=$("syncTxt");
@@ -473,6 +491,17 @@ function bind(){
     s.parentNode.setAttribute("data-stage",s.value);
     saveOpp(s.getAttribute("data-id"),{stage:s.value}).then(function(ok){if(ok)toast("Stage updated")});
   });
+  $("tabPipeline").addEventListener("click",function(){setTab("pipeline")});
+  $("tabDash").addEventListener("click",function(){setTab("dash")});
+  $("view-pipeline").parentNode.querySelector(".tabs").addEventListener("keydown",function(e){
+    if(e.key==="ArrowRight"||e.key==="ArrowLeft"){setTab(S.tab==="dash"?"pipeline":"dash",true);e.preventDefault()}
+  });
+  window.addEventListener("hashchange",function(){setTab(location.hash==="#dashboard"?"dash":"pipeline")});
+  var ts=$("themeSel");
+  if(window.PipelineTheme){
+    ts.value=window.PipelineTheme.get();
+    ts.addEventListener("change",function(){window.PipelineTheme.set(ts.value);if(window.Dash)window.Dash.rerender()});
+  }else ts.hidden=true;
   $("addBtn").addEventListener("click",function(){openDrawer(null)});
   $("exportBtn").addEventListener("click",doExport);
   $("importBtn").addEventListener("click",openImport);
@@ -522,7 +551,9 @@ function load(){
 }
 function busy(){return !$("drawer").hidden||!$("imodal").hidden||settingsDirty||!!document.querySelector(".stage-sel:focus")}
 function init(){
-  bind();render();
+  bind();
+  if(location.hash==="#dashboard")setTab("dash");
+  render();
   window.addEventListener("error",function(e){showBanner("Something went wrong in the page.",e.message)});
   window.addEventListener("unhandledrejection",function(e){showBanner("Something went wrong in the page.",e.reason&&e.reason.message)});
   api("GET","/api/me").then(function(m){S.me=m.name||"";S.bulk=!!m.bulk;updateSync()},function(){});

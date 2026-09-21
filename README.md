@@ -24,6 +24,9 @@ The page and the API are decoupled (the page only calls relative `/api/...` URLs
 | Path | What it is |
 | --- | --- |
 | `web/` | The UI. Plain HTML, CSS and JS, no build step, no third party requests (strict CSP). |
+| `web/dash-calc.js` | Margin and rollup math for the whole page. One source of truth, shared by the table and the Dashboard, tested in Node. |
+| `web/dash.js` | The Dashboard tab. Hand built SVG charts, no chart library. |
+| `web/theme.js` | Applies the saved colour theme before first paint, so there is no flash. |
 | `src/lib/handlers.js` | All routing and rules. Framework free, so tests and the dev server run the same code as Azure. |
 | `src/functions/router.js` | The thin Azure Functions adapter. |
 | `src/lib/store-cosmos.js` | Cosmos access with Entra ID only. |
@@ -55,6 +58,14 @@ npm run seed:sample
 The script will not use whatever `az` happens to be logged into. It switches to the tenant and subscription you pass, prints what it resolved, and makes you type the subscription name before it changes anything. It ends with a health check that expects `store: cosmos`. Rerun with `-SkipInfra` to redeploy code only.
 
 The Cosmos data role for you personally is assigned during deploy and can take a few minutes to propagate. A 403 from `seed:sample` right after deploy means wait and rerun.
+
+## Themes and Dashboard
+
+The Theme menu (top right) has System, Light, Dark, Warm low glare and High contrast. The choice is saved in the browser only. Every theme uses the same colourblind safe chart palette (blue and orange, checked for the common colour vision types). High contrast adds hatch texture to two colour charts, and printing forces the light theme with texture on and hides the controls.
+
+The Dashboard tab sits next to Pipeline (`#dashboard` in the URL is linkable). One row of controls scopes every chart: the measure (estimated margin, weighted margin or deal size), lead, and segment. Charts cover margin by stage and by seller, the expected close timeline, Zones versus Thoughtworks, the largest open deals, and data quality. Every chart has a Table view button that swaps the graphic for the same numbers as a table.
+
+Read the numbers with two caveats. Open deals with no size are counted in deal counts but cannot add to any dollar figure, and the cards say how many were left out. There is also no trend over time, because the app stores the current state only. Trends need weekly snapshots, which is a separate piece of work.
 
 ## Import and export
 
