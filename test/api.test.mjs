@@ -160,8 +160,8 @@ test("static files: whitelist only, no traversal, security headers present", asy
 
 test("me reflects the sign in header", async () => {
   const { call } = await setup();
-  assert.deepEqual(json(await call("GET", "/api/me")), { name: "", authenticated: false, bulk: false });
-  assert.deepEqual(json(await call("GET", "/api/me", undefined, { "x-ms-client-principal-name": "don@example.com" })), { name: "don@example.com", authenticated: true, bulk: true });
+  assert.deepEqual(json(await call("GET", "/api/me")), { name: "", authenticated: false, bulk: false, ai: false, aiWhy: "signin" });
+  assert.deepEqual(json(await call("GET", "/api/me", undefined, { "x-ms-client-principal-name": "don@example.com" })), { name: "don@example.com", authenticated: true, bulk: true, ai: false, aiWhy: "not-configured" });
 });
 
 test("unknown api routes and methods", async () => {

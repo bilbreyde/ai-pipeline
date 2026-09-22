@@ -11,7 +11,7 @@ var COLS=[
   {k:"size",l:"Deal size",num:1},{k:"margin",l:"Est. margin",num:1},{k:"weighted",l:"Weighted",num:1},
   {k:"next",l:"Next step",ns:1},{k:"close",l:"Close"},{k:"updated",l:"Updated"}
 ];
-var S={canWrite:true,me:"",bulk:false,tab:"pipeline",loaded:false,offline:false,err:"",opps:[],settings:clone(DEFAULTS),
+var S={canWrite:true,me:"",bulk:false,ai:false,aiWhy:"",aiDemo:false,tab:"pipeline",loaded:false,offline:false,err:"",opps:[],settings:clone(DEFAULTS),
   sort:{k:"margin",d:"desc"},f:{q:"",stage:"all",lead:"",seg:"",gaps:false},editing:null,delArmed:false};
 var chains={};
 
@@ -208,6 +208,7 @@ function renderTable(){
       var m=marginOf(o),w=weightedOf(o),gaps=gapsOf(o);
       var tags=gaps.map(function(g){return '<span class="tag">'+g+'</span>'}).join("");
       if(o.tw==="Engaged"||o.tw==="Strong fit"||o.tw==="Target")tags+='<span class="tag tw">TW '+esc(o.tw.toLowerCase())+'</span>';
+      if(o.activityCount)tags+='<span class="tag mtg" title="Meeting history, last on '+esc(new Date(o.lastActivityAt).toLocaleDateString("en-US",{month:"short",day:"numeric"}))+'">'+o.activityCount+(o.activityCount===1?" meeting":" meetings")+'</span>';
       var cd=parseDate(o.closeDate),late=cd&&isOpen(o)&&cd<today;
       var age=daysAgo(o.updatedAt),stale=age!=null&&age>14&&isOpen(o);
       var who=(o.updatedBy||"").split("@")[0];
@@ -319,11 +320,28 @@ function openDrawer(id){
   $("dmeta").textContent=o&&o.updatedAt?"Last saved "+new Date(o.updatedAt).toLocaleDateString("en-US",{month:"short",day:"numeric"})+(who?" by "+who:""):"";
   $("ddel").hidden=!o||!S.canWrite;$("dsave").hidden=!S.canWrite;
   ["f-account","f-opp","f-stage","f-segment","f-lead","f-seller","f-tw","f-close","f-size","f-gm","f-next","f-notes"].forEach(function(i){$(i).disabled=!S.canWrite});
-  updatePreview();
+  updatePreview();loadHistory(o);
   $("scrim").hidden=false;$("drawer").hidden=false;
   setTimeout(function(){$("f-account").focus()},30);
 }
 function closeDrawer(){$("drawer").hidden=true;$("scrim").hidden=true;S.editing=null}
+function shortDate(iso){var d=new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso)?iso+"T00:00:00":iso);return isNaN(d)?"":d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:d.getFullYear()===new Date().getFullYear()?undefined:"numeric"})}
+function bullets(title,list){return list&&list.length?'<p class="h-t">'+title+'</p><ul>'+list.map(function(x){return '<li>'+esc(x)+'</li>'}).join("")+'</ul>':""}
+function loadHistory(o){
+  var box=$("dhist");
+  if(!o||!o.activityCount){box.hidden=true;box.innerHTML="";return}
+  var id=o.id;
+  box.hidden=false;box.innerHTML='<h3>Meeting history</h3><p class="hint">Loading</p>';
+  api("GET","/api/opps/"+encodeURIComponent(id)+"/activity").then(function(r){
+    if(S.editing!==id)return;
+    box.innerHTML='<h3>Meeting history <small>'+r.items.length+'</small></h3>'+r.items.map(function(a,i){
+      var who=(a.by||"").split("@")[0];
+      return '<details class="hist-item"'+(i===0?" open":"")+'><summary><b>'+esc(shortDate(a.date))+'</b> <span>'+esc(a.source||"")+(who?" · "+esc(who):"")+'</span></summary>'+
+        (a.summary?'<p>'+esc(a.summary)+'</p>':"")+bullets("Decisions",a.decisions)+bullets("Action items",a.actionItems)+bullets("Risks",a.risks)+
+        (a.applied&&a.applied.length?'<p class="hint">Updated: '+esc(a.applied.join(", "))+'</p>':"")+'</details>';
+    }).join("");
+  },function(e){if(S.editing===id)box.innerHTML='<h3>Meeting history</h3><p class="hint">Could not load it: '+esc(errMsg(e))+'</p>'});
+}
 function doSave(){
   var d=readForm();
   if(!d.account){toast("Account name is required.",true);$("f-account").focus();return}
@@ -549,17 +567,20 @@ function load(){
     render(true);
   });
 }
-function busy(){return !$("drawer").hidden||!$("imodal").hidden||settingsDirty||!!document.querySelector(".stage-sel:focus")}
+function busy(){return !$("drawer").hidden||!$("imodal").hidden||!$("tmodal").hidden||settingsDirty||!!document.querySelector(".stage-sel:focus")}
 function init(){
   bind();
   if(location.hash==="#dashboard")setTab("dash");
   render();
   window.addEventListener("error",function(e){showBanner("Something went wrong in the page.",e.message)});
   window.addEventListener("unhandledrejection",function(e){showBanner("Something went wrong in the page.",e.reason&&e.reason.message)});
-  api("GET","/api/me").then(function(m){S.me=m.name||"";S.bulk=!!m.bulk;updateSync()},function(){});
+  api("GET","/api/me").then(function(m){S.me=m.name||"";S.bulk=!!m.bulk;S.ai=!!m.ai;S.aiWhy=m.aiWhy||"";S.aiDemo=!!m.aiDemo;updateSync()},function(){});
   load();
   setInterval(function(){if(!document.hidden&&!busy())load()},20000);
   document.addEventListener("visibilitychange",function(){if(!document.hidden&&!busy())load()});
 }
+/* what the transcript dialog (transcript.js) needs from this file */
+window.PipelineApp={api:api,toast:toast,esc:esc,errMsg:errMsg,load:load,parseMoney:parseMoney,full:full,openDrawer:openDrawer,shortDate:shortDate,
+  opps:function(){return S.opps},ai:function(){return {ok:S.ai,why:S.aiWhy,demo:S.aiDemo}},canWrite:function(){return S.canWrite}};
 init();
 })();

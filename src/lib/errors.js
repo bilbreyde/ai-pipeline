@@ -12,3 +12,11 @@ export class ImportError extends Error {
     this.name = "ImportError";
   }
 }
+
+/** The row changed after the person's review started, so saving would overwrite something they never saw. */
+export class StaleError extends Error {
+  constructor(message = "This opportunity was changed after the transcript was analysed.") {
+    super(message);
+    this.name = "StaleError";
+  }
+}

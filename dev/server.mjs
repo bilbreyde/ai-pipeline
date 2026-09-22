@@ -9,6 +9,8 @@ import { fileURLToPath } from "node:url";
 import { createHandlers } from "../src/lib/handlers.js";
 import { createMemoryStore } from "../src/lib/store-memory.js";
 import { SAMPLE_OPPS } from "../src/lib/sample-data.js";
+import { aiFromEnv } from "../src/lib/ai.js";
+import { createMockAi } from "./mock-ai.mjs";
 
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../web");
 const port = Number(process.env.PORT ?? 7071);
@@ -18,7 +20,10 @@ const now = new Date().toISOString();
 for (const o of SAMPLE_OPPS) {
   await store.upsert({ ...o, createdAt: now, createdBy: "sample", updatedAt: now, updatedBy: "sample" });
 }
-const api = createHandlers({ store, webRoot, log: (m) => console.error(m), allowAnonymousBulk: process.env.ALLOW_ANONYMOUS_BULK !== "false" });
+// Transcripts: the demo model unless FOUNDRY_ENDPOINT and FOUNDRY_DEPLOYMENT are set (then it calls the real Foundry
+// resource with your az login). Set AI=off to see the "not set up" state.
+const ai = process.env.AI === "off" ? null : (await aiFromEnv(process.env, (m) => console.error(m))) ?? createMockAi();
+const api = createHandlers({ store, webRoot, log: (m) => console.error(m), info: (m) => console.log(m), allowAnonymousBulk: process.env.ALLOW_ANONYMOUS_BULK !== "false", ai });
 
 const server = http.createServer(async (req, res) => {
   const chunks = [];
@@ -32,4 +37,4 @@ const server = http.createServer(async (req, res) => {
   res.end(req.method === "HEAD" ? undefined : out.body);
 });
 
-server.listen(port, () => console.log(`Pipeline dev server on http://localhost:${port} (memory store, sample data)`));
+server.listen(port, () => console.log(`Pipeline dev server on http://localhost:${port} (memory store, sample data, AI: ${ai ? ai.kind : "off"})`));

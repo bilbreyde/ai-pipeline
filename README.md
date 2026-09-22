@@ -34,6 +34,12 @@ The page and the API are decoupled (the page only calls relative `/api/...` URLs
 | `scripts/deploy.ps1` | Tenant guarded deploy. |
 | `scripts/seed-sample.mjs` | Loads fictional demo rows. |
 | `src/lib/xlsx.js` | Spreadsheet export, and the import parser, planner and writer. Used by the page and the script. |
+| `src/lib/transcript.js` | Reads pasted text, .txt, .vtt, .srt and .docx into plain text. |
+| `src/lib/transcript-analysis.js` | The prompt, the answer schema, and the checks that turn a model answer into a reviewable proposal. |
+| `src/lib/ai.js` | Microsoft Foundry client. Entra ID only, no API key. |
+| `web/transcript-ui.js` | The From transcript dialog. |
+| `dev/mock-ai.mjs` | Stand in model for `npm run dev` and tests, so the flow works without Azure. |
+| `scripts/setup-foundry.ps1` | Creates the Foundry resource and model deployment and wires the Function App to it. |
 | `scripts/import-from-excel.mjs` | Command line import of a workbook. Gated, see below. |
 
 ## Run it locally (no Azure needed)
@@ -66,6 +72,46 @@ The Theme menu (top right) has System, Light, Dark, Warm low glare and High cont
 The Dashboard tab sits next to Pipeline (`#dashboard` in the URL is linkable). One row of controls scopes every chart: the measure (estimated margin, weighted margin or deal size), lead, and segment. Charts cover margin by stage and by seller, the expected close timeline, Zones versus Thoughtworks, the largest open deals, and data quality. Every chart has a Table view button that swaps the graphic for the same numbers as a table.
 
 Read the numbers with two caveats. Open deals with no size are counted in deal counts but cannot add to any dollar figure, and the cards say how many were left out. There is also no trend over time, because the app stores the current state only. Trends need weekly snapshots, which is a separate piece of work.
+
+## Transcripts
+
+The **From transcript** button takes meeting notes or a Teams transcript and turns them into a reviewable proposal. Paste text, choose a file (`.txt`, `.vtt`, `.srt`, `.docx`), or drop a file anywhere on the page. Two modes:
+
+* **An existing opportunity.** Pick the row, or leave it on "Detect it from the transcript" and the model chooses from your list, which you then confirm. It proposes changes to stage, deal size, GM%, expected close, next step, seller, lead, segment and Thoughtworks involvement, and a meeting summary with decisions, action items and risks.
+* **A new opportunity.** It proposes an account and every field the transcript supports. If the account looks like one you already track, the dialog warns you and offers to update that row instead.
+
+Nothing is saved until you press Save on the review step. Every proposed change is a checkbox with an editable value and the exact quote from the transcript that supports it. The server checks each quote against the transcript. A quote that is not really there is flagged in amber and left unticked. Stage changes to Won or Lost are labelled "Closes the deal". The meeting summary is editable and is saved to that opportunity's **Meeting history**, which shows in the row's edit panel and never touches the free text Notes field. Each opportunity keeps its newest 25 meetings.
+
+What is and is not kept: the transcript itself is analysed in memory and is not stored by this app. Only the fields you ticked and the summary you approved are saved. If someone else changes the row while you are reviewing, Save is refused with a message and you re-run the analysis, so you never overwrite something you have not seen.
+
+### Set up Foundry once
+
+```powershell
+# Prints every az command and changes nothing. Read it first.
+./scripts/setup-foundry.ps1 -TenantId <tid> -SubscriptionId <sid> -DryRun
+./scripts/setup-foundry.ps1 -TenantId <tid> -SubscriptionId <sid>
+```
+
+The script is standalone (it does not touch `infra/` or `deploy.ps1`). It creates a Foundry resource with a custom subdomain, deploys `gpt-5.4-mini` (the newest version your region offers) using the first deployment SKU your region offers from DataZoneStandard, Standard, GlobalStandard, turns off API key access, gives the Function App's managed identity **Cognitive Services OpenAI User** (and you, for local testing), and sets `FOUNDRY_ENDPOINT`, `FOUNDRY_DEPLOYMENT` and, for gpt-5 and o-series models, `FOUNDRY_REASONING_EFFORT=low` on the Function App. Then deploy the code with `deploy.ps1 -SkipInfra`. Until Foundry is set up the button explains that instead of failing.
+
+To try it against the real model from your machine, the script prints the exact `$env:` lines. Without them `npm run dev` uses a demo matcher and the page says so on every step. `AI=off npm run dev` shows the not set up state.
+
+### Swapping the model (models retire every 12 to 18 months)
+
+The model is not baked into the code. It is two things: which deployment `FOUNDRY_DEPLOYMENT` points at, and a few request settings. To move to a newer model, rerun the script with `-Model`. It deploys the new model next to the old one, points the app at it, and prints the command to delete the old deployment once you are satisfied. Nothing is renamed and there is no downtime.
+
+```powershell
+./scripts/setup-foundry.ps1 -TenantId <tid> -SubscriptionId <sid> -Model gpt-5.5 -DryRun
+```
+
+Deployments are named after the model (`transcripts-gpt-5-4-mini`), so the name never lies about what is behind it. See what your subscription can deploy with `az cognitiveservices model list -l eastus2`. Prefer a small, fast model: this job is extracting fields from text, not reasoning through a hard problem, so a bigger model mostly adds cost and seconds. Reasoning models (gpt-5 family, o-series) count their hidden thinking against the output token cap, which is why the client asks for 16000 and the script sets low effort.
+
+### Before you point real transcripts at it
+
+* **Sign in first.** Like import and export, transcript analysis is refused unless a user is signed in, because it sends customer conversations to a model and costs money per call. `ALLOW_ANONYMOUS_BULK=true` lifts that for testing with fictional transcripts only.
+* **Data handling is a Zones decision, not a code one.** The model runs in your tenant and the app uses Entra ID only. Deployment type still matters: GlobalStandard can process prompts in any Azure region, DataZoneStandard stays inside the US or EU data zone, Standard stays in the resource's region. Microsoft's default abuse monitoring can also retain prompts for a limited time unless your organisation has been approved for modified abuse monitoring. Confirm both against current Microsoft documentation and your customer contracts before real transcripts go in.
+* **Transcripts are untrusted text.** Someone can say "ignore your instructions" in a meeting. The model has no tools and returns schema constrained JSON, every value is re-validated by the same rules as a manual edit, and nothing saves without your review. The residual risk is a bad proposal that you tick without reading, which is why quotes are shown next to every change.
+* **Limits.** 200,000 characters of text, 4 MB per file, one analysis takes roughly 10 to 40 seconds.
 
 ## Import and export
 

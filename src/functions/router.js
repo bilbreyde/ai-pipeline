@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHandlers } from "../lib/handlers.js";
 import { createStore } from "../lib/store.js";
+import { aiFromEnv } from "../lib/ai.js";
 
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../web");
 let api;
@@ -19,7 +20,16 @@ app.http("router", {
   authLevel: "anonymous", // Sign in is added at the platform layer (App Service authentication), not here.
   route: "{*rest}",
   handler: async (request, context) => {
-    api ??= createHandlers({ store: createStore(), webRoot, log: (m) => context.error(m), allowAnonymousBulk });
+    if (!api) {
+      // Transcript analysis is optional. A missing or broken Foundry setting turns only that feature off, never the site.
+      let ai = null;
+      try {
+        ai = await aiFromEnv(process.env, (m) => context.error(m));
+      } catch (e) {
+        context.error(`Foundry is misconfigured, transcript analysis is off: ${e.message}`);
+      }
+      api = createHandlers({ store: createStore(), webRoot, log: (m) => context.error(m), info: (m) => context.log(m), allowAnonymousBulk, ai });
+    }
 
     const hasBody = !["GET", "HEAD", "DELETE"].includes(request.method);
     const result = await api.handle({

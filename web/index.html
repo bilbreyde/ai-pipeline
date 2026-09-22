@@ -25,6 +25,7 @@
       <span class="sync" id="sync" data-state="wait"><i></i><span id="syncTxt">Connecting</span></span>
       <button class="btn" id="importBtn" type="button">Import</button>
       <button class="btn" id="exportBtn" type="button">Export</button>
+      <button class="btn" id="txBtn" type="button">From transcript</button>
       <button class="btn primary" id="addBtn" type="button">Add opportunity</button>
     </div>
   </div>
@@ -117,6 +118,7 @@
     <div class="full preview" id="preview"></div>
     <label class="full">Next step<textarea id="f-next"></textarea></label>
     <label class="full">Notes<textarea id="f-notes"></textarea></label>
+    <section class="full hist" id="dhist" aria-label="Meeting history" hidden></section>
   </form>
   <datalist id="sellers"></datalist>
   <div class="dfoot">
@@ -140,6 +142,17 @@
     <span class="grow" id="imMeta"></span>
   </div>
 </section>
+<div id="tscrim" hidden></div>
+<section id="tmodal" role="dialog" aria-modal="true" aria-labelledby="tmTitle" hidden>
+  <header><h2 id="tmTitle">Add from transcript</h2><button class="x" id="tmClose" type="button" aria-label="Close">&times;</button></header>
+  <div class="tm-body" id="tmBody"></div>
+  <div class="dfoot">
+    <button class="btn primary" id="tmGo" type="button">Analyze transcript</button>
+    <button class="btn" id="tmBack" type="button" hidden>Back</button>
+    <button class="btn" id="tmCancel" type="button">Cancel</button>
+    <span class="grow" id="tmMeta"></span>
+  </div>
+</section>
 <div id="toast" role="status" hidden></div>
 <svg class="defs" aria-hidden="true" focusable="false"><defs>
   <pattern id="tx-c1" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" class="pt-c1"/><rect width="3" height="8" class="pt-line"/></pattern>
@@ -149,5 +162,6 @@
 <script src="dash-calc.js" defer></script>
 <script src="dash.js" defer></script>
 <script src="app.js" defer></script>
+<script src="transcript-ui.js" defer></script>
 </body>
 </html>

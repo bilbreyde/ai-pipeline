@@ -19,6 +19,7 @@
     "@azure/cosmos": "^4.10.1",
     "@azure/functions": "^4.16.5",
     "@azure/identity": "^4.13.3",
-    "exceljs": "^4.4.0"
+    "exceljs": "^4.4.0",
+    "jszip": "^3.10.2"
   }
 }
