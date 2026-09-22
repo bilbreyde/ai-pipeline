@@ -9,6 +9,8 @@ import { ConflictError } from "./errors.js";
 const OPP = "opp";
 const SETTINGS = "settings";
 const SETTINGS_ID = "config";
+const SELLERS = "sellers";
+const SELLERS_ID = "directory";
 
 const isStatus = (e, code) => e && (e.code === code || e.statusCode === code);
 
@@ -90,6 +92,24 @@ export function createCosmosStore({ endpoint, database, container }) {
 
     async putSettings(value) {
       await c.items.upsert({ ...value, id: SETTINGS_ID, type: SETTINGS });
+      return value;
+    },
+
+    /** One small document, same pattern as settings: { byKey: { "<lower cased seller name>": { name, email } } }. */
+    async getSellerDirectory() {
+      try {
+        const { resource } = await c.item(SELLERS_ID, SELLERS).read();
+        if (!resource) return null;
+        const { id, ...rest } = toPublic(resource);
+        return rest;
+      } catch (e) {
+        if (isStatus(e, 404)) return null;
+        throw e;
+      }
+    },
+
+    async putSellerDirectory(value) {
+      await c.items.upsert({ ...value, id: SELLERS_ID, type: SELLERS });
       return value;
     },
   };

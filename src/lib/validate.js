@@ -114,6 +114,29 @@ export function validateOpp(input, { partial = false } = {}) {
   return { value: out, errors: [] };
 }
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Validate a seller directory entry: { name, email }. Used to save the address "Request update" mails go to.
+ * Returns { value: { name, email }, errors }. email is lower cased; name keeps the casing given, since it is
+ * shown back to the person, not just matched on.
+ */
+export function validateSeller(input) {
+  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+    return { errors: ["Body must be a JSON object."] };
+  }
+  const errors = [];
+  const name = typeof input.name === "string" ? input.name.trim() : "";
+  if (!name) errors.push("name is required.");
+  else if (name.length > 80) errors.push("name must be 80 characters or fewer.");
+  const email = typeof input.email === "string" ? input.email.trim() : "";
+  if (!email) errors.push("email is required.");
+  else if (email.length > 200) errors.push("email must be 200 characters or fewer.");
+  else if (!EMAIL_PATTERN.test(email)) errors.push("That does not look like an email address.");
+  if (errors.length) return { errors };
+  return { value: { name, email: email.toLowerCase() }, errors: [] };
+}
+
 /** Validate a settings payload. Returns { value, errors }. */
 export function validateSettings(input) {
   if (input === null || typeof input !== "object" || Array.isArray(input)) {

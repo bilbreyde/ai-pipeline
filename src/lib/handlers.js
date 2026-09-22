@@ -12,7 +12,7 @@ import { AiError } from "./ai.js";
 import { TranscriptError, extractTranscript } from "./transcript.js";
 import { analyzeTranscript, appendActivity, isRealDate, validateNote } from "./transcript-analysis.js";
 import { mergeUpdate } from "./mutate.js";
-import { DEFAULT_SETTINGS, ID_PATTERN, validateOpp, validateSettings } from "./validate.js";
+import { DEFAULT_SETTINGS, ID_PATTERN, validateOpp, validateSeller, validateSettings } from "./validate.js";
 import { XLSX_TYPE, applyPlan, buildWorkbook, describePlan, parseWorkbook, planImport } from "./xlsx.js";
 
 const MAX_BODY_BYTES = 64 * 1024;
@@ -185,6 +185,38 @@ export function createHandlers({ store, webRoot, log = () => {}, info = () => {}
       if (!(e instanceof ConflictError)) throw e;
     }
     return fail(409, "Someone else is editing this row. Reload and try again.");
+  }
+
+  /**
+   * The seller directory backs "Request update": a name typed on an opportunity is matched to it case
+   * insensitively (the Seller field is free text, so casing drifts), but the name shown back to people
+   * is whatever was last saved for that key. Emails are never mailed anywhere by the server, so there is
+   * no route here that sends anything; this only stores the address "Request update" builds a mailto: link
+   * to, client side, in the person's own mail client.
+   */
+  async function currentSellerDirectory() {
+    const saved = await store.getSellerDirectory();
+    return saved && typeof saved.byKey === "object" && saved.byKey && !Array.isArray(saved.byKey) ? saved.byKey : {};
+  }
+
+  async function listSellers() {
+    const byKey = await currentSellerDirectory();
+    const sellers = {};
+    for (const rec of Object.values(byKey)) {
+      if (rec && typeof rec.name === "string" && typeof rec.email === "string") sellers[rec.name] = rec.email;
+    }
+    return respond(200, { sellers });
+  }
+
+  async function upsertSeller(req) {
+    const parsed = parseJson(req.body);
+    if (parsed.error) return fail(parsed.status ?? 400, parsed.error);
+    const { value, errors } = validateSeller(parsed.value);
+    if (errors.length) return fail(400, "Seller is not valid.", errors);
+    const byKey = await currentSellerDirectory();
+    const next = { ...byKey, [value.name.toLowerCase()]: value };
+    await store.putSellerDirectory({ byKey: next });
+    return respond(200, { seller: value });
   }
 
   async function listActivity(id) {
@@ -364,6 +396,12 @@ export function createHandlers({ store, webRoot, log = () => {}, info = () => {}
         const removed = await store.remove(id);
         return removed ? respond(200, { deleted: id }) : fail(404, "Opportunity not found.");
       }
+      return fail(405, "Method not allowed.");
+    }
+
+    if (resource === "sellers" && !id) {
+      if (method === "GET") return listSellers();
+      if (method === "POST") return upsertSeller(req);
       return fail(405, "Method not allowed.");
     }
 

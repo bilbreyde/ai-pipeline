@@ -12,7 +12,7 @@ var COLS=[
   {k:"next",l:"Next step",ns:1},{k:"close",l:"Close"},{k:"updated",l:"Updated"}
 ];
 var S={canWrite:true,me:"",bulk:false,ai:false,aiWhy:"",aiDemo:false,tab:"pipeline",loaded:false,offline:false,err:"",opps:[],settings:clone(DEFAULTS),
-  sort:{k:"margin",d:"desc"},f:{q:"",stage:"all",lead:"",seg:"",gaps:false},editing:null,delArmed:false};
+  sellers:{},sort:{k:"margin",d:"desc"},f:{q:"",stage:"all",lead:"",seg:"",gaps:false},editing:null,delArmed:false};
 var chains={};
 
 function $(id){return document.getElementById(id)}
@@ -42,6 +42,13 @@ function todayStart(){var d=new Date();d.setHours(0,0,0,0);return d}
 function parseDate(s){if(!s)return null;var d=new Date(s+"T00:00:00");return isNaN(d)?null:d}
 function fmtDate(d){return d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:d.getFullYear()===new Date().getFullYear()?undefined:"numeric"})}
 function daysAgo(iso){if(!iso)return null;var t=Date.parse(iso);if(isNaN(t))return null;return Math.floor((Date.now()-t)/864e5)}
+/* Seller field on a row is free text, so match the saved directory by name, not exact string. */
+function sellerKey(n){return String(n||"").trim().toLowerCase()}
+function sellerEmail(name){
+  var k=sellerKey(name);if(!k)return null;
+  for(var n in S.sellers){if(Object.prototype.hasOwnProperty.call(S.sellers,n)&&sellerKey(n)===k)return S.sellers[n]}
+  return null;
+}
 
 /* ---------- toast ---------- */
 var toastT;
@@ -233,6 +240,7 @@ function renderTable(){
   $("tfoot").innerHTML=rows.length?'<tr><td class="lbl" colspan="3">Total, open opportunities shown ('+n+')</td><td class="num">'+full(ts)+'</td><td class="num">'+full(tm)+'</td><td class="num">'+full(tw)+'</td><td colspan="3"></td></tr>':"";
   $("count").textContent="Showing "+rows.length+" of "+S.opps.length;
   var sel=$("sellers"),set={};S.opps.forEach(function(o){if(o.seller)set[o.seller]=1});
+  for(var sn in S.sellers){if(Object.prototype.hasOwnProperty.call(S.sellers,sn))set[sn]=1}
   sel.innerHTML=Object.keys(set).sort().map(function(s){return '<option value="'+esc(s)+'">'}).join("");
 }
 function syncAssumptions(){
@@ -318,7 +326,7 @@ function openDrawer(id){
   $("f-next").value=v.nextStep||"";$("f-notes").value=v.notes||"";
   var who=o&&(o.updatedBy||"").split("@")[0];
   $("dmeta").textContent=o&&o.updatedAt?"Last saved "+new Date(o.updatedAt).toLocaleDateString("en-US",{month:"short",day:"numeric"})+(who?" by "+who:""):"";
-  $("ddel").hidden=!o||!S.canWrite;$("dsave").hidden=!S.canWrite;
+  $("ddel").hidden=!o||!S.canWrite;$("dsave").hidden=!S.canWrite;$("dreq").hidden=!o||!S.canWrite;
   ["f-account","f-opp","f-stage","f-segment","f-lead","f-seller","f-tw","f-close","f-size","f-gm","f-next","f-notes"].forEach(function(i){$(i).disabled=!S.canWrite});
   updatePreview();loadHistory(o);
   $("scrim").hidden=false;$("drawer").hidden=false;
@@ -342,6 +350,58 @@ function loadHistory(o){
     }).join("");
   },function(e){if(S.editing===id)box.innerHTML='<h3>Meeting history</h3><p class="hint">Could not load it: '+esc(errMsg(e))+'</p>'});
 }
+/* ---------- request update from the seller ---------- */
+/* Nothing here sends mail. A mailto: link opens the person's own mail client with the seller's address,
+   a subject and a body already filled in; they review it and send it themselves, from their own mailbox.
+   The only thing the server stores is the seller's email address, once, in the seller directory. */
+function updateMailBody(d){
+  var lines=["Hi "+(d.seller||"")+",","","Could you send a quick status update on this one when you get a chance?",""];
+  lines.push("Account: "+(d.account||""));
+  if(d.opportunity)lines.push("Opportunity: "+d.opportunity);
+  lines.push("Stage: "+d.stage);
+  if(d.closeDate)lines.push("Expected close: "+shortDate(d.closeDate));
+  if(d.nextStep)lines.push("Next step on file: "+d.nextStep);
+  lines.push("","Thanks!");
+  return lines.join("\n");
+}
+function openUpdateMail(d,email){
+  var subject="Status update: "+(d.account||"opportunity")+(d.opportunity?" ("+d.opportunity+")":"");
+  var href="mailto:"+encodeURIComponent(email)+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(updateMailBody(d));
+  // A clicked mailto: link hands off to the OS mail handler without touching this page (unlike
+  // location.href=, which some browsers treat as a real, if aborted, navigation attempt).
+  var a=document.createElement("a");a.href=href;a.rel="noopener";
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+var pendingReq=null;
+function openSellerPrompt(d){
+  pendingReq=d;
+  $("sHint").textContent="No email saved for "+d.seller+" yet. Save it once and every deal of theirs will have it.";
+  $("sEmail").value="";$("sErr").hidden=true;$("sSave").disabled=false;
+  $("sscrim").hidden=false;$("smodal").hidden=false;
+  setTimeout(function(){$("sEmail").focus()},30);
+}
+function closeSellerPrompt(){$("sscrim").hidden=true;$("smodal").hidden=true;pendingReq=null}
+function saveSellerEmail(){
+  var d=pendingReq;if(!d)return;
+  var email=$("sEmail").value.trim();
+  $("sSave").disabled=true;$("sErr").hidden=true;
+  api("POST","/api/sellers",{name:d.seller,email:email}).then(function(r){
+    S.sellers[r.seller.name]=r.seller.email;
+    closeSellerPrompt();
+    openUpdateMail(d,r.seller.email);
+  },function(e){
+    $("sSave").disabled=false;
+    $("sErr").textContent=errMsg(e);$("sErr").hidden=false;
+    setTimeout(function(){$("sEmail").focus()},10);
+  });
+}
+function doRequestUpdate(){
+  var d=readForm();
+  if(!d.seller){toast("Set a seller on this opportunity first",true);return}
+  var email=sellerEmail(d.seller);
+  if(email)openUpdateMail(d,email);else openSellerPrompt(d);
+}
+
 function doSave(){
   var d=readForm();
   if(!d.account){toast("Account name is required.",true);$("f-account").focus();return}
@@ -530,11 +590,15 @@ function bind(){
   $("dclose").addEventListener("click",closeDrawer);$("dcancel").addEventListener("click",closeDrawer);
   $("scrim").addEventListener("click",closeDrawer);
   $("dsave").addEventListener("click",doSave);$("ddel").addEventListener("click",doDelete);
+  $("dreq").addEventListener("click",doRequestUpdate);
+  $("sclose").addEventListener("click",closeSellerPrompt);$("sCancel").addEventListener("click",closeSellerPrompt);
+  $("sscrim").addEventListener("click",closeSellerPrompt);$("sSave").addEventListener("click",saveSellerEmail);
+  $("sEmail").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();saveSellerEmail()}});
   $("dform").addEventListener("input",updatePreview);
   $("dform").addEventListener("submit",function(e){e.preventDefault();doSave()});
   document.addEventListener("keydown",function(e){
     if(e.key!=="Escape")return;
-    if(!$("imodal").hidden)closeImport();else if(!$("drawer").hidden)closeDrawer();
+    if(!$("smodal").hidden)closeSellerPrompt();else if(!$("imodal").hidden)closeImport();else if(!$("drawer").hidden)closeDrawer();
   });
   ["basisPrice","basisCost","defGm"].forEach(function(i){$(i).addEventListener("input",saveSettings);$(i).addEventListener("change",saveSettings)});
   $("probs").addEventListener("input",saveSettings);
@@ -555,9 +619,10 @@ function showBanner(msg,detail){
   b.hidden=false;
 }
 function load(){
-  return Promise.all([api("GET","/api/opps"),api("GET","/api/settings")]).then(function(r){
+  return Promise.all([api("GET","/api/opps"),api("GET","/api/settings"),api("GET","/api/sellers")]).then(function(r){
     S.opps=r[0].items||[];
     if(!settingsDirty)S.settings=mergeSettings(r[1].settings);
+    S.sellers=r[2].sellers||{};
     S.loaded=true;S.offline=false;S.err="";
     $("banner").hidden=true;
     render();
@@ -567,7 +632,7 @@ function load(){
     render(true);
   });
 }
-function busy(){return !$("drawer").hidden||!$("imodal").hidden||!$("tmodal").hidden||settingsDirty||!!document.querySelector(".stage-sel:focus")}
+function busy(){return !$("drawer").hidden||!$("imodal").hidden||!$("tmodal").hidden||!$("smodal").hidden||settingsDirty||!!document.querySelector(".stage-sel:focus")}
 function init(){
   bind();
   if(location.hash==="#dashboard")setTab("dash");

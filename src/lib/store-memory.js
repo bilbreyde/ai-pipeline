@@ -6,6 +6,7 @@ import { ConflictError } from "./errors.js";
 export function createMemoryStore() {
   const opps = new Map();
   let settings = null;
+  let sellers = null;
   let etagSeq = 0;
   const nextEtag = () => `"${++etagSeq}"`;
   const copy = (o) => structuredClone(o);
@@ -51,6 +52,16 @@ export function createMemoryStore() {
     async putSettings(value) {
       settings = copy(value);
       return copy(settings);
+    },
+
+    /** { byKey: { "<lower cased seller name>": { name, email } } }, the same shape as Cosmos. */
+    async getSellerDirectory() {
+      return sellers ? copy(sellers) : null;
+    },
+
+    async putSellerDirectory(value) {
+      sellers = copy(value);
+      return copy(sellers);
     },
   };
 }

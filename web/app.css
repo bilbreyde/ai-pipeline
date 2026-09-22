@@ -226,10 +226,10 @@ input[type=number],input[type=text],input[type=date],input[type=search],select,t
 @media (max-width:560px){#concBars .brow{grid-template-columns:110px 1fr 44px}}
 
 /* import dialog */
-#iscrim,#tscrim{position:fixed;inset:0;background:rgba(6,12,26,.5);z-index:60}
+#iscrim,#tscrim,#sscrim{position:fixed;inset:0;background:rgba(6,12,26,.5);z-index:60}
 #imodal{position:fixed;z-index:65;top:50%;left:50%;transform:translate(-50%,-50%);width:min(680px,calc(100% - 32px));max-height:calc(100% - 48px);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);display:flex;flex-direction:column}
-#imodal header,#tmodal header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line)}
-#imodal header h2,#tmodal header h2{margin:0;font-size:16px}
+#imodal header,#tmodal header,#smodal header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line)}
+#imodal header h2,#tmodal header h2,#smodal header h2{margin:0;font-size:16px}
 .im-body{padding:16px 20px;overflow:auto;display:flex;flex-direction:column;gap:14px}
 .im-lead{margin:0}
 .im-file{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink-2)}
@@ -370,6 +370,7 @@ table.dt tbody tr:hover{background:transparent}
 :root[data-theme="contrast"] .seg,
 :root[data-theme="contrast"] #imodal,
 :root[data-theme="contrast"] #tmodal,
+:root[data-theme="contrast"] #smodal,
 :root[data-theme="contrast"] #drawer,
 :root[data-theme="contrast"] #tip,
 :root[data-theme="contrast"] select,
@@ -404,7 +405,7 @@ table.dt tbody tr:hover{background:transparent}
     color-scheme:light;
   }
   body{background:#fff}
-  .top-actions,.tabs,.dash-filters,.tbl-toggle,#toast,#drawer,#imodal,#tmodal,#scrim,#iscrim,#tscrim,.banner,#tip{display:none!important}
+  .top-actions,.tabs,.dash-filters,.tbl-toggle,#toast,#drawer,#imodal,#tmodal,#smodal,#scrim,#iscrim,#tscrim,#sscrim,.banner,#tip{display:none!important}
   .card,.kpis{break-inside:avoid}
   .app{padding-block:0;max-width:none}
   .chart .mark.tx.c1{fill:url(#tx-c1)}
@@ -426,6 +427,13 @@ table.dt tbody tr:hover{background:transparent}
 .hist-item ul{margin:0;padding-left:18px;color:var(--ink-2)}
 .hist-item .hint{margin:8px 0 0}
 .tag.mtg{background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line)}
+
+/* seller email dialog: asks for a seller's address once, the first time "Request update" needs it */
+#smodal{position:fixed;z-index:65;top:50%;left:50%;transform:translate(-50%,-50%);width:min(420px,calc(100% - 32px));background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);display:flex;flex-direction:column}
+.sm-body{padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.sm-body label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:var(--ink-2)}
+.sm-body .hint{margin:0}
+.sm-body .hint.err{color:var(--crit)}
 
 /* transcript dialog */
 #tmodal{position:fixed;z-index:65;top:50%;left:50%;transform:translate(-50%,-50%);width:min(820px,calc(100% - 32px));max-height:calc(100% - 32px);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);display:flex;flex-direction:column}

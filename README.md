@@ -30,6 +30,7 @@ The page and the API are decoupled (the page only calls relative `/api/...` URLs
 | `src/lib/handlers.js` | All routing and rules. Framework free, so tests and the dev server run the same code as Azure. |
 | `src/functions/router.js` | The thin Azure Functions adapter. |
 | `src/lib/store-cosmos.js` | Cosmos access with Entra ID only. |
+| `src/lib/validate.js` | Field rules for opportunities, settings and the seller directory. |
 | `infra/main.bicep` | Function App, Cosmos, storage, monitoring, role assignments. |
 | `scripts/deploy.ps1` | Tenant guarded deploy. |
 | `scripts/seed-sample.mjs` | Loads fictional demo rows. |
@@ -112,6 +113,14 @@ Deployments are named after the model (`transcripts-gpt-5-4-mini`), so the name 
 * **Data handling is a Zones decision, not a code one.** The model runs in your tenant and the app uses Entra ID only. Deployment type still matters: GlobalStandard can process prompts in any Azure region, DataZoneStandard stays inside the US or EU data zone, Standard stays in the resource's region. Microsoft's default abuse monitoring can also retain prompts for a limited time unless your organisation has been approved for modified abuse monitoring. Confirm both against current Microsoft documentation and your customer contracts before real transcripts go in.
 * **Transcripts are untrusted text.** Someone can say "ignore your instructions" in a meeting. The model has no tools and returns schema constrained JSON, every value is re-validated by the same rules as a manual edit, and nothing saves without your review. The residual risk is a bad proposal that you tick without reading, which is why quotes are shown next to every change.
 * **Limits.** 200,000 characters of text, 4 MB per file, one analysis takes roughly 10 to 40 seconds.
+
+## Request update from the seller
+
+Open an opportunity and click **Request update**. If the seller has an email on file, a draft opens in your own mail client, addressed to them, with the account, stage, expected close and next step already filled in. You review it and send it yourself, from your own mailbox. Nothing here sends mail automatically and nothing is queued: the button only builds a `mailto:` link.
+
+The first time you use it for a given seller, you are asked for their email once. It is saved to a small seller directory (name to email), not copied onto every opportunity row, so the next request for that seller, on any deal, needs no prompt. The Seller field itself stays free text; the match against the directory ignores case, so "Avery" and "avery" are the same seller.
+
+This needs nothing new in Azure: no email service, no secrets, no new role assignment. The address is stored the same way Settings is, in one small Cosmos document, and everything else happens in the browser.
 
 ## Import and export
 

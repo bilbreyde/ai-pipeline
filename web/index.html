@@ -124,10 +124,24 @@
   <div class="dfoot">
     <button class="btn primary" id="dsave" type="button">Save</button>
     <button class="btn" id="dcancel" type="button">Cancel</button>
+    <button class="btn" id="dreq" type="button" hidden>Request update</button>
     <span class="grow" id="dmeta"></span>
     <button class="btn danger" id="ddel" type="button">Delete</button>
   </div>
 </aside>
+<div id="sscrim" hidden></div>
+<section id="smodal" role="dialog" aria-modal="true" aria-labelledby="smTitle" hidden>
+  <header><h2 id="smTitle">Seller's email</h2><button class="x" id="sclose" type="button" aria-label="Close">&times;</button></header>
+  <div class="sm-body">
+    <p class="hint" id="sHint"></p>
+    <label class="full">Email address<input type="email" id="sEmail" autocomplete="off" placeholder="name@zones.com"></label>
+    <p class="hint err" id="sErr" hidden></p>
+  </div>
+  <div class="dfoot">
+    <button class="btn primary" id="sSave" type="button">Save and open email</button>
+    <button class="btn" id="sCancel" type="button">Cancel</button>
+  </div>
+</section>
 <div id="iscrim" hidden></div>
 <section id="imodal" role="dialog" aria-modal="true" aria-labelledby="imTitle" hidden>
   <header><h2 id="imTitle">Import from spreadsheet</h2><button class="x" id="imClose" type="button" aria-label="Close">&times;</button></header>

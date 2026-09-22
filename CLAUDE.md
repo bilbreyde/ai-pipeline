@@ -20,7 +20,7 @@ AI Practice Pipeline tracker for Zones LLC. One Azure Function App (Flex Consump
 
 ```powershell
 npm ci
-npm test                       # 102 tests, no Azure needed
+npm test                       # 110 tests, no Azure needed
 npm run dev                    # local server, in memory, http://localhost:7071
 ./scripts/deploy.ps1 -TenantId <tid> -SubscriptionId <sid>
 ./scripts/deploy.ps1 -TenantId <tid> -SubscriptionId <sid> -SkipInfra   # code only
@@ -31,7 +31,7 @@ npm run seed:sample
 
 * `src/lib/handlers.js` holds all routing, validation calls and security headers. `src/functions/router.js` is a thin adapter with one catch all route. `dev/server.mjs` and the tests call the same `handle()`.
 * `host.json` sets `routePrefix` to an empty string so `/` serves the page and `/api/*` the API.
-* Cosmos container `items`, partition key `/type` (`opp` or `settings`). Updates read, merge, then replace with an etag and retry on conflict.
+* Cosmos container `items`, partition key `/type` (`opp`, `settings` or `sellers`). Updates read, merge, then replace with an etag and retry on conflict.
 * `src/lib/xlsx.js` owns spreadsheet export and import. `exceljs` is loaded with a dynamic `import()` inside its functions so ordinary page loads never pay for it. Import is parse, plan (read only), then apply, and apply re-parses the upload rather than trusting the preview. Updates go through `src/lib/mutate.js` (`mergeUpdate`), the same etag retry path as PATCH. Import never deletes.
 * `web/dash-calc.js` is the single source of margin math (`marginOf`, `weightedOf`, `gapsOf`, rollups). `web/app.js` delegates to it, so the table and the Dashboard cannot disagree. It has no DOM access and is unit tested in Node through `vm`. Change math there, never in `app.js` or `dash.js`.
 * `web/dash.js` builds charts as inline SVG with `createElementNS` and `textContent`. No chart library, no `innerHTML` with data. Marks are at most 24px thick with a 4px rounded data end and a 2px gap between stacked segments. Every card has a Table view twin, so a tooltip is never the only way to read a value.
@@ -43,6 +43,7 @@ npm run seed:sample
 * Apply for an update sends `baseUpdatedAt`. `mergeUpdate` accepts a function patch so the stale check and the history append run against the freshly read row on every etag retry. A changed row returns 409.
 * `dev/mock-ai.mjs` is a regex stand in for the model. `npm run dev` uses it unless `FOUNDRY_ENDPOINT` and `FOUNDRY_DEPLOYMENT` are set, and the page shows a demo banner (`/api/me` returns `aiDemo`). Tests inject fake models and a fake `fetch`, so nothing touches Azure.
 * CSP is strict: scripts and styles from self only. Do not add CDN links or inline scripts. Fonts are system fonts on purpose.
+* **Request update.** `GET /api/sellers` and `POST /api/sellers` (`{name, email}`, validated by `validateSeller` in `src/lib/validate.js`) read and write one small directory document, the same singleton pattern as settings (`store.getSellerDirectory`/`putSellerDirectory`, one Cosmos doc keyed by the lower cased seller name). Neither route sends anything anywhere: `web/app.js` builds a `mailto:` link client side and clicks a throwaway anchor to open it in the person's own mail client. There is no email service in this app, on purpose, so there is nothing to configure and nothing that can spam a seller on its own: someone has to see the draft and hit send. Do not add a real send path (Communication Services, Graph `sendMail`, anything else) without deciding, as a Zones question and not a code one, who it sends as and where quota and cost land.
 
 ## Not verified from the authoring environment (no az, no Bicep, no Azure access there)
 
