@@ -43,8 +43,25 @@ test("totals separate open, won and lost, and count unsized deals without adding
   assert.equal(d.kpi.won.margin, 60000);
   assert.equal(d.kpi.lost.n, 1);
   assert.equal(d.kpi.blendedGm, 0.3);
-  assert.equal(d.byStage.map((g) => g.key).join(), "Identified,Discovery,Qualified,Proposal / RFP,Blocked");
-  assert.equal(d.byStage[1].unsized, 1);
+  assert.equal(d.byStage.map((g) => g.key).join(), "Account planning,Identified,Discovery,Qualified,Proposal / RFP,Blocked");
+  assert.equal(d.byStage[2].unsized, 1);
+});
+
+test("Account planning has no margin and its missing size is not a data gap, unlike every other open stage", () => {
+  const planned = opp({ account: "P", stage: "Account planning" }); // no size, no seller override needed here
+  assert.equal(C.marginOf(planned, ST), null);
+  assert.deepEqual(plain(C.gapsOf(planned)), []);
+  const plannedNoSeller = opp({ account: "P2", stage: "Account planning", seller: "" });
+  assert.deepEqual(plain(C.gapsOf(plannedNoSeller)), ["No seller"]); // still flagged: only "No size" is exempt
+  const identifiedNoSize = opp({ account: "I", stage: "Identified" });
+  assert.deepEqual(plain(C.gapsOf(identifiedNoSize)), ["No size"]); // every other open stage is unaffected
+
+  const d = build([planned, opp({ account: "D", size: 100000, stage: "Discovery" })]);
+  assert.equal(d.gaps.open, 2);
+  assert.equal(d.gaps.noSize, 0); // the Account planning row doesn't count, the Discovery row has a size
+  assert.equal(d.byStage[0].key, "Account planning");
+  assert.equal(d.byStage[0].n, 1);
+  assert.equal(d.byStage[0].size, 0);
 });
 
 test("lead and segment filters scope every number", () => {

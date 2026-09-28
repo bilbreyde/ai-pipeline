@@ -254,7 +254,7 @@ function fillTables(card) {
 
 var ORD = ["o1", "o2", "o3", "o4"];
 var TW_ORD_CLS = { "Engaged": "o4", "Strong fit": "o3", "Target": "o2", "Potential": "o1", "Not indicated": "cg", "Zones only": "cg" };
-var STAGE_CLS = { "Identified": "o1", "Discovery": "o2", "Qualified": "o3", "Proposal / RFP": "o4", "Blocked": "cg" };
+var STAGE_CLS = { "Account planning": "cg", "Identified": "o1", "Discovery": "o2", "Qualified": "o3", "Proposal / RFP": "o4", "Blocked": "cg" };
 
 function build() {
   var stage = makeCard("stage", "Margin by stage");
@@ -268,7 +268,7 @@ function build() {
     });
     hBars(stage.body, rows, { aria: C.MEASURES[m] + " by stage" });
     var unsized = data.kpi.open.unsized;
-    stage.sub.textContent = C.MEASURES[m] + " on " + plural(data.kpi.open.n, "open deal") + ". Darker bars are later in the sales process. Blocked is gray." +
+    stage.sub.textContent = C.MEASURES[m] + " on " + plural(data.kpi.open.n, "open deal") + ". Darker bars are later in the sales process. Blocked and Account planning are gray, since neither has a place in that order." +
       (unsized ? " " + plural(unsized, "deal") + " without a size " + (unsized === 1 ? "is" : "are") + " not counted." : "");
     stage.specs = [{
       caption: "Open pipeline by stage", head: ["Stage", "Deals", "Deal size", "Est. margin"],

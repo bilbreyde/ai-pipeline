@@ -150,6 +150,8 @@ Estimated margin = deal size × GM%, where GM% is a default (30%) with an option
 
 Resale heavy deals (hardware, licences) do not carry consulting margins. Set a real GM% on those rows, or the total is fiction. The page warns when one deal is over a third of the margin.
 
+**Account planning** is the earliest stage, before Identified. It tracks an account you plan to approach about AI, before there is a real opportunity. No size or margin is expected there, so a blank size on an Account planning row is not flagged as a data gap the way it would be at every later stage. It still counts as an open deal, and it still shows up in the Dashboard's by stage chart, in gray alongside Blocked, since neither has a place in the "darker means later in the sales process" order.
+
 ## Before real customer data
 
 The beta has no sign in. Anyone with the URL can read and edit. Do these in order, then import:

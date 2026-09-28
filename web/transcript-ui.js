@@ -7,7 +7,7 @@ var A=window.PipelineApp;
 if(!A)return;
 var $=function(id){return document.getElementById(id)};
 var esc=A.esc;
-var STAGES=["Identified","Discovery","Qualified","Proposal / RFP","Blocked","Won","Lost"];
+var STAGES=["Account planning","Identified","Discovery","Qualified","Proposal / RFP","Blocked","Won","Lost"];
 var TW=["Engaged","Strong fit","Target","Potential","Not indicated","Zones only"];
 var LEADS=["Zones","Thoughtworks"];
 var SEGMENTS=["ITS","ENT","MM","Healthcare","SLED / Public Sector Utility"];

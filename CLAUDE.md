@@ -20,7 +20,7 @@ AI Practice Pipeline tracker for Zones LLC. One Azure Function App (Flex Consump
 
 ```powershell
 npm ci
-npm test                       # 111 tests, no Azure needed
+npm test                       # 112 tests, no Azure needed
 npm run dev                    # local server, in memory, http://localhost:7071
 ./scripts/deploy.ps1 -TenantId <tid> -SubscriptionId <sid>
 ./scripts/deploy.ps1 -TenantId <tid> -SubscriptionId <sid> -SkipInfra   # code only
@@ -34,6 +34,7 @@ npm run seed:sample
 * Cosmos container `items`, partition key `/type` (`opp`, `settings` or `sellers`). Updates read, merge, then replace with an etag and retry on conflict.
 * `src/lib/xlsx.js` owns spreadsheet export and import. `exceljs` is loaded with a dynamic `import()` inside its functions so ordinary page loads never pay for it. Import is parse, plan (read only), then apply, and apply re-parses the upload rather than trusting the preview. Updates go through `src/lib/mutate.js` (`mergeUpdate`), the same etag retry path as PATCH. Import never deletes.
 * `web/dash-calc.js` is the single source of margin math (`marginOf`, `gapsOf`, rollups). `web/app.js` delegates to it, so the table and the Dashboard cannot disagree. It has no DOM access and is unit tested in Node through `vm`. Change math there, never in `app.js` or `dash.js`. There is no weighted margin or win probability: forecasting is a sales function, not something this tracker computes.
+* `STAGES` and `OPEN` are defined once in `web/dash-calc.js` (chart math) and again in `src/lib/validate.js` (API validation, and `src/lib/xlsx.js`'s dropdown reads this one). `web/app.js` keeps its own `STAGES` and `OPEN` for the table's stage picker, filter, sort order and the Pipeline tab's by stage bars (it delegates the math to `dash-calc.js`, not these arrays). `web/transcript-ui.js` keeps its own `STAGES` for the transcript review dropdown, since it has no import step. Adding, removing or reordering a stage means editing all four, in that order, then giving each open stage a colour token in `STAGE_CLS` in `web/dash.js` (a missing entry gets no colour class, so its bar has no colour of its own), then updating the tests that assert `byStage` key order.
 * `web/dash.js` builds charts as inline SVG with `createElementNS` and `textContent`. No chart library, no `innerHTML` with data. Marks are at most 24px thick with a 4px rounded data end and a 2px gap between stacked segments. Every card has a Table view twin, so a tooltip is never the only way to read a value.
 * Themes are `data-theme` on `<html>` (light, dark, warm, contrast). No attribute means follow the OS. `web/theme.js` is a separate synchronous script in `<head>` (CSP forbids inline script) so the page never flashes the wrong theme. `test/theme-contrast.test.mjs` parses the real `app.css` and asserts WCAG ratios per theme, so a token edit that hurts readability fails `npm test`.
 * Chart colours are tokens (`--c1`, `--c2`, `--cg`, `--o1` to `--o4`). Do not add a ninth categorical hue. Orange on the warm and high contrast surfaces is 2.89:1, which is relieved by direct labels and the Table view. Hatch texture is only on for High contrast and print.

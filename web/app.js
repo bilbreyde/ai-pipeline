@@ -1,7 +1,7 @@
 (function(){
 "use strict";
-var STAGES=["Identified","Discovery","Qualified","Proposal / RFP","Blocked","Won","Lost"];
-var OPEN=["Identified","Discovery","Qualified","Proposal / RFP","Blocked"];
+var STAGES=["Account planning","Identified","Discovery","Qualified","Proposal / RFP","Blocked","Won","Lost"];
+var OPEN=["Account planning","Identified","Discovery","Qualified","Proposal / RFP","Blocked"];
 var SEGMENTS=["ITS","ENT","MM","Healthcare","SLED / Public Sector Utility"];
 var LEADS=["Zones","Thoughtworks"];
 var TW=["Engaged","Strong fit","Target","Potential","Not indicated","Zones only"];

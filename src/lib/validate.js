@@ -1,6 +1,6 @@
 // Field rules for opportunities and settings. Shared by the API and the importer.
 
-export const STAGES = ["Identified", "Discovery", "Qualified", "Proposal / RFP", "Blocked", "Won", "Lost"];
+export const STAGES = ["Account planning", "Identified", "Discovery", "Qualified", "Proposal / RFP", "Blocked", "Won", "Lost"];
 export const TW_STATUS = ["Engaged", "Strong fit", "Target", "Potential", "Not indicated", "Zones only"];
 export const LEADS = ["", "Zones", "Thoughtworks"];
 export const ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;

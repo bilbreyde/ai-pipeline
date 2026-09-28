@@ -3,8 +3,8 @@
 (function (root) {
 "use strict";
 
-var STAGES = ["Identified", "Discovery", "Qualified", "Proposal / RFP", "Blocked", "Won", "Lost"];
-var OPEN = ["Identified", "Discovery", "Qualified", "Proposal / RFP", "Blocked"];
+var STAGES = ["Account planning", "Identified", "Discovery", "Qualified", "Proposal / RFP", "Blocked", "Won", "Lost"];
+var OPEN = ["Account planning", "Identified", "Discovery", "Qualified", "Proposal / RFP", "Blocked"];
 var TW_ORDER = ["Engaged", "Strong fit", "Target", "Potential", "Not indicated", "Zones only"];
 var MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 var MEASURES = { margin: "Estimated margin", size: "Deal size" };
@@ -23,7 +23,9 @@ function marginOf(o, st) {
 function gapsOf(o) {
   if (!isOpen(o)) return [];
   var g = [];
-  if (o.size == null) g.push("No size");
+  // Account planning tracks accounts before there is a real opportunity, so no size is expected there,
+  // not a data gap. See README, Margin, so nobody is surprised.
+  if (o.size == null && o.stage !== "Account planning") g.push("No size");
   if (!o.seller) g.push("No seller");
   if (!o.nextStep) g.push("No next step");
   return g;
@@ -115,7 +117,7 @@ function build(opps, st, opts) {
   open.forEach(function (o) {
     var g = gapsOf(o);
     if (g.length) gaps.anyGap++;
-    if (o.size == null) gaps.noSize++;
+    if (o.size == null && o.stage !== "Account planning") gaps.noSize++;
     if (!o.seller) gaps.noSeller++;
     if (!o.nextStep) gaps.noNext++;
     if (o.closeDate && o.closeDate < today) gaps.overdue++;
