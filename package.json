@@ -13,7 +13,8 @@
     "dev": "node dev/server.mjs",
     "test": "node --test \"test/**/*.test.mjs\"",
     "seed:sample": "node scripts/seed-sample.mjs",
-    "import": "node scripts/import-from-excel.mjs"
+    "import": "node scripts/import-from-excel.mjs",
+    "users": "node scripts/manage-users.mjs"
   },
   "dependencies": {
     "@azure/cosmos": "^4.10.1",

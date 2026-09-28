@@ -1,56 +1,93 @@
-# Overlay: Account planning stage
+# Username and password sign in — overlay
 
-Adds a new stage, "Account planning", before Identified. It tracks an account you plan to approach about AI, before there is a real opportunity. No size or margin is expected there, and a blank size at that stage is not treated as a data gap. This only touches the files listed below.
+Adds real sign in to the tracker: individual accounts, not a shared password. There is no Entra ID
+here (this is a dev tenant with no app registration available), so this is username and password,
+hashed with Node's built in `scrypt`, sessions as opaque tokens in Cosmos. There is no admin role
+and no user management screen in the app on purpose — accounts are created, reset and revoked with
+`scripts/manage-users.mjs`, run from your own machine against Cosmos with your own `az login`, the
+same trust boundary `scripts/seed-sample.mjs` already uses.
 
-## Before you start
-
-1. Read `CLAUDE.md` in the project root first, especially the new note under Architecture notes about `STAGES` being defined in three places.
-2. Make sure your working tree is clean (`git status`) so this overlay's diff is easy to review and easy to revert if needed.
-
-## What changed and why
-
-* `web/dash-calc.js` — `STAGES` and `OPEN` both get "Account planning" as the first entry. `gapsOf()` and `build()`'s gap counting no longer flag a missing size at this stage, since none is expected. Every other stage is unaffected: a missing size still flags a gap everywhere else.
-* `src/lib/validate.js` — `STAGES` gets the same addition, so the API accepts it and the exporter's Stage dropdown includes it (that dropdown reads `STAGES` from here).
-* `web/app.js` — this file keeps its own copy of `STAGES` and `OPEN` for the pipeline table's stage picker, sort order, and the Pipeline tab's own "by stage" bars. **This is the file most likely to get missed if this feature is ever touched again**: it does not delegate to `dash-calc.js` for these two arrays the way it does for the math functions. Both are updated here.
-* `web/transcript-ui.js` — same story, its own `STAGES` copy for the transcript review dropdown. Updated.
-* `web/dash.js` — `STAGE_CLS` maps "Account planning" to the existing gray token (`cg`), the same one Blocked already uses, rather than extending the blue sequential ramp. The lightest step of that ramp (`--o1`) already sits right at the readability floor this app's own contrast test enforces (about 2:1 against the surface in every theme), so there was no room to add a lighter step without either failing that test or shipping a bar nobody could see. Gray also reads correctly: Account planning isn't part of the "how close is this deal" story the blue ramp tells, so treating it like Blocked (also outside that story) is the more honest choice, not just the safer one. The chart's caption text was updated to say so. No new CSS colors were added.
-* `src/lib/sample-data.js` — one new fictional record, Relecloud, stage Account planning, no size, so the walkthrough below has something real to look at.
-* `test/dash-calc.test.mjs` — updated the `byStage` key order assertion, added a test covering the no-size exemption and confirming no-seller/no-next-step still flag normally.
-* `README.md`, `CLAUDE.md` — document the new stage and, in CLAUDE.md, the three-places-define-STAGES trap above.
+As a necessary consequence, every `/api/*` route except `health` and `me` now refuses an
+anonymous caller (`403 Sign in to see or change pipeline data.`) unless `ALLOW_ANONYMOUS_BULK=true`
+is set. Previously only import, export and transcript analysis were gated; everything else relied
+on Azure's platform level sign in redirect, which does not exist in this tenant. This overlay closes
+that gap at the application level.
 
 ## Apply
 
-Copy these files into the project, preserving their relative paths. Diff each one against what is already there before overwriting, since you may have made local edits since this overlay was built:
+From the root of your `zones-ai-pipeline` checkout, with Claude Code:
 
 ```
-web/dash-calc.js
-web/app.js
-web/dash.js
-web/transcript-ui.js
-src/lib/validate.js
-src/lib/sample-data.js
-test/dash-calc.test.mjs
-README.md
-CLAUDE.md
+Apply this overlay: copy every file under this zip into the matching path in the project,
+overwriting what is there. Then run npm test and confirm all tests pass.
 ```
 
-Do not touch `infra/` or `scripts/deploy.ps1`. This overlay has no infrastructure or deployment changes.
+Or by hand: copy each file in this zip to the same relative path in the project, overwriting
+the existing one. New files: `src/lib/auth.js`, `scripts/manage-users.mjs`, `test/auth.test.mjs`.
+Everything else replaces a file that is already there.
 
 ## Verify
 
 ```powershell
-npm test
+npm test              # 135 tests, was 112 before this overlay
+npm run dev            # http://localhost:7071, data is open by default (no sign in needed)
 ```
 
-Expect exactly `112 tests`, `112 pass`, `0 fail`.
+To see the real sign in screen locally, without Cosmos:
 
-Then a manual walkthrough (`npm run dev`, fictional sample data):
+```powershell
+$env:ALLOW_ANONYMOUS_BULK="false"
+$env:DEV_LOGIN_USER="don"
+$env:DEV_LOGIN_PASSWORD="a password at least 12 characters"
+npm run dev
+```
 
-1. **Pipeline tab.** The Stage dropdown on every row, and the Stage filter dropdown above the table, both list "Account planning" first, before Identified. The sample row Relecloud is at Account planning with a blank deal size and margin, and shows no orange gap tags (not "No size").
-2. **A row you set to Account planning yourself** with no seller: it should show a "No seller" gap tag, confirming only the size exemption is special, not the whole stage.
-3. **Dashboard tab, Margin by stage card.** Account planning is the first row, shown in gray like Blocked, labeled "No size" rather than "$0". The caption below the chart explains why both are gray.
-4. **KPI band and Data quality card.** The open opportunity count includes Account planning rows. The "No deal size" gap count does not include them.
-5. **From transcript.** Open the dialog and confirm "Account planning" appears in the manual stage override dropdown.
-6. **Export.** The Stage column's dropdown validation in the exported .xlsx includes Account planning.
+Then open http://localhost:7071 — you should land on a Sign in screen, not the tracker. Sign in
+with the account above and you should see the tracker, a "Connected as don" indicator, and
+Change password / Sign out controls next to it.
 
-If any of these checks fail, do not deploy. Stop and diff against this overlay's source files.
+## Do this right after you deploy it — do not skip
+
+`ALLOW_ANONYMOUS_BULK` is off by default on the deployed app (as it always has been), and this
+overlay now gates *everything*, not just import and export. That means the moment this deploys,
+sign in is required and **nobody has an account yet**. Run this as the very last step of the
+deploy, before you send the URL to anyone:
+
+```powershell
+./scripts/deploy.ps1 -TenantId <tid> -SubscriptionId <sid> -SkipInfra
+npm run users create <your-username>
+```
+
+It prints a generated password once. Write it down, sign in with it, then use Change password in
+the app to set one only you know. From then on, `npm run users create <name>` makes an account for
+anyone else who needs one. See the README's new "Sign in" section for the rest of the commands
+(`reset-password`, `unlock`, `revoke`, `list`).
+
+## What changed, file by file
+
+| File | What changed |
+| --- | --- |
+| `src/lib/auth.js` | New. Password hashing, session tokens, lockout, cookie helpers. |
+| `src/lib/store-memory.js`, `src/lib/store-cosmos.js` | Added `user` and `session` document types and their get/put/delete/list methods. |
+| `src/lib/handlers.js` | `resolveActor` now checks the session cookie first, the Entra header second. New `login`/`logout`/`change-password` routes. A blanket sign in gate in `handleApi` now protects every pipeline data route, not just bulk import/export. |
+| `src/functions/router.js` | Comment update only, explaining the new gate lives in `handlers.js`, not at the platform layer. No behavior change. |
+| `dev/server.mjs` | `secureCookies: false` for local http. New optional `DEV_LOGIN_USER`/`DEV_LOGIN_PASSWORD` to seed a real test account. |
+| `scripts/manage-users.mjs` | New. Account lifecycle: `create`, `reset-password`, `unlock`, `revoke`, `list`. |
+| `scripts/import-from-excel.mjs` | Comment update only (the old one said "the MVP has no sign in," which stopped being true). |
+| `package.json` | New `npm run users` script. |
+| `web/index.html`, `web/app.js`, `web/app.css` | Sign in gate, Change password dialog, Sign out, a "Sign in" button and user pill in the top bar. |
+| `test/api.test.mjs`, `test/sellers-api.test.mjs` | `setup()` now passes `allowAnonymousBulk: true` so existing CRUD tests are unaffected by the new gate; one test explicitly turns it off to check the signed out `/api/me` response. |
+| `test/auth.test.mjs` | New. 23 tests: hashing, sessions, lockout, cookies, the sign in gate itself, and the full login/logout/change password/revoke flow through the HTTP handler. |
+| `README.md`, `CLAUDE.md` | New "Sign in" section, updated "Before real customer data," updated hard rules and architecture notes. |
+
+## Verified before packaging
+
+* `npm test`: 135/135 pass (112 before this overlay, +23 new).
+* Browser regression, signed out and gated (`ALLOW_ANONYMOUS_BULK=false`): sign in gate on load,
+  wrong password and unknown username give the identical generic error, correct login clears the
+  gate and loads data, session survives a reload, change password (wrong current password, mismatched
+  confirmation, too short, and a real change) all work, sign out brings the gate back, the old
+  password stops working and the new one signs in, 5 wrong attempts lock the account so even the
+  correct password is refused, no horizontal overflow at 390px, no console or CSP errors. 22/22 checks.
+* Browser regression, default local dev (`ALLOW_ANONYMOUS_BULK` unset, i.e. open): dashboard, seller
+  email prompt, and transcript flows all still pass unchanged: 25/25, 17/17, 31/31.

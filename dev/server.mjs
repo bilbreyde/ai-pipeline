@@ -11,6 +11,7 @@ import { createMemoryStore } from "../src/lib/store-memory.js";
 import { SAMPLE_OPPS } from "../src/lib/sample-data.js";
 import { aiFromEnv } from "../src/lib/ai.js";
 import { createMockAi } from "./mock-ai.mjs";
+import { hashPassword } from "../src/lib/auth.js";
 
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../web");
 const port = Number(process.env.PORT ?? 7071);
@@ -20,10 +21,20 @@ const now = new Date().toISOString();
 for (const o of SAMPLE_OPPS) {
   await store.upsert({ ...o, createdAt: now, createdBy: "sample", updatedAt: now, updatedBy: "sample" });
 }
+// Lets you try the real sign in screen locally, without Cosmos: DEV_LOGIN_USER=don DEV_LOGIN_PASSWORD=... npm run dev
+// This is separate from DEV_USER below, which fakes the Entra header instead of a real session.
+if (process.env.DEV_LOGIN_USER && process.env.DEV_LOGIN_PASSWORD) {
+  const username = process.env.DEV_LOGIN_USER.trim().toLowerCase();
+  const { hash, salt } = await hashPassword(process.env.DEV_LOGIN_PASSWORD);
+  await store.putUser({ id: username, username, passwordHash: hash, passwordSalt: salt, failedAttempts: 0, lockedUntil: null, createdAt: now });
+  console.log(`Dev account ready: sign in as "${username}" with the password from DEV_LOGIN_PASSWORD.`);
+}
 // Transcripts: the demo model unless FOUNDRY_ENDPOINT and FOUNDRY_DEPLOYMENT are set (then it calls the real Foundry
 // resource with your az login). Set AI=off to see the "not set up" state.
 const ai = process.env.AI === "off" ? null : (await aiFromEnv(process.env, (m) => console.error(m))) ?? createMockAi();
-const api = createHandlers({ store, webRoot, log: (m) => console.error(m), info: (m) => console.log(m), allowAnonymousBulk: process.env.ALLOW_ANONYMOUS_BULK !== "false", ai });
+// secureCookies is off here because this server is always plain http. Azure always gets https, so
+// the real app never sets this to false; see src/functions/router.js.
+const api = createHandlers({ store, webRoot, log: (m) => console.error(m), info: (m) => console.log(m), allowAnonymousBulk: process.env.ALLOW_ANONYMOUS_BULK !== "false", ai, secureCookies: false });
 
 const server = http.createServer(async (req, res) => {
   const chunks = [];

@@ -14,6 +14,11 @@ import { analyzeTranscript, appendActivity, isRealDate, validateNote } from "./t
 import { mergeUpdate } from "./mutate.js";
 import { DEFAULT_SETTINGS, ID_PATTERN, validateOpp, validateSeller, validateSettings } from "./validate.js";
 import { XLSX_TYPE, applyPlan, buildWorkbook, describePlan, parseWorkbook, planImport } from "./xlsx.js";
+import {
+  SESSION_COOKIE, clearFailedAttempts, clearSessionCookie, hashPassword, isExpired, isLocked,
+  newSessionToken, normalizeUsername, parseCookies, recordFailedAttempt, sessionExpiry,
+  setSessionCookie, validatePassword, verifyPassword,
+} from "./auth.js";
 
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // the .xlsx itself
@@ -57,8 +62,23 @@ const respond = (status, payload, extra = {}) => ({
 });
 const fail = (status, message, details) => respond(status, details?.length ? { error: message, details } : { error: message });
 
-/** Who made the request. Azure built in authentication sets this header; anonymous until it is enabled. */
-export function actorFrom(headers) {
+/**
+ * Who made the request. Checks our own session cookie first (username and password sign in,
+ * see auth.js and scripts/manage-users.mjs), then falls back to the header Azure App Service
+ * Authentication sets when Entra sign in is configured in front of this Function App, so a
+ * tenant that can turn Entra on later needs no code change to use it instead. Anonymous, "", when
+ * neither is present. A session whose user account has been deleted (access revoked) or whose
+ * session has expired is treated as anonymous, never as a stale identity.
+ */
+export async function resolveActor(headers, store) {
+  const token = parseCookies(headers["cookie"])[SESSION_COOKIE];
+  if (token) {
+    const session = await store.getSession(token);
+    if (session && !isExpired(session.expiresAt)) {
+      const user = await store.getUser(session.username);
+      if (user) return user.username;
+    }
+  }
   const raw = headers["x-ms-client-principal-name"];
   return typeof raw === "string" ? raw.trim().slice(0, 120) : "";
 }
@@ -84,13 +104,17 @@ function crossSiteBlocked(headers) {
 }
 
 /**
- * allowAnonymousBulk: import and export are refused unless a user is signed in, because they move the whole
- * data set in one request. Set true only for local development or for testing with fictional data.
- * The same gate covers transcript analysis, which sends customer conversations to a model and costs money per call.
+ * allowAnonymousBulk: with no user signed in, this also opens every pipeline data route, not only
+ * import, export and transcript. It is what makes `npm run dev` usable without signing in first.
+ * Set true only for local development or for testing with fictional data; never with real data present.
  * ai: a Foundry client (or the local mock) with extract(), or null when the feature is not configured.
+ * secureCookies: false only for local http development, where a Secure cookie would never be sent back.
  */
-export function createHandlers({ store, webRoot, log = () => {}, info = () => {}, allowAnonymousBulk = false, ai = null }) {
+export function createHandlers({ store, webRoot, log = () => {}, info = () => {}, allowAnonymousBulk = false, ai = null, secureCookies = true }) {
   const fileCache = new Map();
+  // A fixed decoy so a login attempt for a username that does not exist still pays the same scrypt
+  // cost as a real one, rather than returning early and letting response time reveal which is true.
+  const decoyPassword = hashPassword("not-a-real-password-used-only-for-timing");
 
   async function serveStatic(rel) {
     const entry = STATIC_FILES[rel];
@@ -117,6 +141,71 @@ export function createHandlers({ store, webRoot, log = () => {}, info = () => {}
       : aiWhy(actor) === "not-configured"
         ? fail(503, "Transcript analysis is not set up yet. It needs a Microsoft Foundry resource, see the README section Transcripts.")
         : null;
+
+  const signInBlocked = () => fail(403, "Sign in to see or change pipeline data.");
+  const BAD_LOGIN = "Invalid username or password.";
+
+  /**
+   * Never distinguishes "no such account" from "wrong password" in the response or in how long it
+   * takes to answer: both run a real scrypt comparison, against the decoy when the account does not
+   * exist, so the response time does not leak which case happened.
+   */
+  async function login(req) {
+    const parsed = parseJson(req.body);
+    if (parsed.error) return fail(parsed.status ?? 400, parsed.error);
+    const { username, password } = parsed.value ?? {};
+    if (typeof username !== "string" || typeof password !== "string" || !username || !password) {
+      return fail(400, "username and password are required.");
+    }
+    const name = normalizeUsername(username);
+    const user = await store.getUser(name);
+    const { hash: decoyHash, salt: decoySalt } = await decoyPassword;
+    const passwordOk = user
+      ? await verifyPassword(password, user.passwordHash, user.passwordSalt)
+      : await verifyPassword(password, decoyHash, decoySalt); // pays the same cost as a real check, result unused
+    // A locked account refuses every attempt, right or wrong, and an attempt during the lock is not
+    // recorded: recordFailedAttempt would restart the count and clear lockedUntil, ending the lock early.
+    if (user && isLocked(user)) return fail(401, BAD_LOGIN);
+    if (!user || !passwordOk) {
+      if (user) await store.putUser({ ...user, ...recordFailedAttempt(user) });
+      return fail(401, BAD_LOGIN);
+    }
+    await store.putUser({ ...user, ...clearFailedAttempts() });
+    const token = newSessionToken();
+    await store.putSession({ id: token, type: "session", username: user.username, createdAt: new Date().toISOString(), expiresAt: sessionExpiry() });
+    info(`sign in by=${user.username}`);
+    return respond(200, { name: user.username }, { "Set-Cookie": setSessionCookie(token, { secure: secureCookies }) });
+  }
+
+  async function logout(req) {
+    const token = parseCookies(req.headers["cookie"])[SESSION_COOKIE];
+    if (token) await store.deleteSession(token);
+    return respond(200, { ok: true }, { "Set-Cookie": clearSessionCookie({ secure: secureCookies }) });
+  }
+
+  async function changePassword(req, actor) {
+    if (actor === "") return signInBlocked();
+    const parsed = parseJson(req.body);
+    if (parsed.error) return fail(parsed.status ?? 400, parsed.error);
+    const { currentPassword, newPassword } = parsed.value ?? {};
+    if (typeof currentPassword !== "string" || typeof newPassword !== "string") {
+      return fail(400, "currentPassword and newPassword are required.");
+    }
+    const user = await store.getUser(actor);
+    if (!user) return signInBlocked(); // the account behind this session was deleted since it was issued
+    if (!(await verifyPassword(currentPassword, user.passwordHash, user.passwordSalt))) {
+      return fail(401, "Current password is not correct.");
+    }
+    if (!validatePassword(newPassword)) return fail(400, "New password must be 12 to 200 characters.");
+    const { hash, salt } = await hashPassword(newPassword);
+    await store.putUser({ ...user, passwordHash: hash, passwordSalt: salt, ...clearFailedAttempts() });
+    // Sign out every other session for this account, so a changed password also shuts out whoever
+    // may have had the old one. The session making this request stays signed in.
+    const current = parseCookies(req.headers["cookie"])[SESSION_COOKIE];
+    await store.deleteSessionsFor(actor, { except: current });
+    info(`password changed by=${actor}`);
+    return respond(200, { ok: true });
+  }
 
   /** The list and item responses carry only a count of meetings. The entries load on demand, so polling stays light. */
   function publicOpp(doc) {
@@ -340,11 +429,22 @@ export function createHandlers({ store, webRoot, log = () => {}, info = () => {}
     }
   }
 
+  const PUBLIC_RESOURCES = new Set(["health", "me"]);
+
   async function handleApi(rel, req) {
     const method = req.method;
-    const actor = actorFrom(req.headers);
+    const actor = await resolveActor(req.headers, store);
     const parts = rel.split("/").slice(1); // drop "api"
     const [resource, id, ...extra] = parts;
+
+    // Everything below is pipeline data, or an action that touches it, except health, me, and
+    // signing in or out (you need those to reach a signed in state in the first place). Without
+    // this, sign in would only decide what the UI shows, not what the API accepts, since there is
+    // no platform level login redirect in front of this Function the way Entra provides.
+    const isPublicAuthRoute = resource === "auth" && (id === "login" || id === "logout");
+    if (!PUBLIC_RESOURCES.has(resource) && !isPublicAuthRoute && actor === "" && !allowAnonymousBulk) {
+      return signInBlocked();
+    }
 
     if (resource === "opps" && id && extra.length === 1 && extra[0] === "activity") {
       if (!ID_PATTERN.test(id)) return fail(400, "Invalid id.");
@@ -382,6 +482,13 @@ export function createHandlers({ store, webRoot, log = () => {}, info = () => {}
 
     if (resource === "import" && (id === "preview" || id === "apply")) {
       return method === "POST" ? importWorkbook(id, req, actor) : fail(405, "Method not allowed.");
+    }
+
+    if (resource === "auth" && (id === "login" || id === "logout" || id === "change-password")) {
+      if (method !== "POST") return fail(405, "Method not allowed.");
+      if (id === "login") return login(req);
+      if (id === "logout") return logout(req);
+      return changePassword(req, actor);
     }
 
     if (resource === "opps") {

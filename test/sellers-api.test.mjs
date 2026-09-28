@@ -11,7 +11,7 @@ async function setup() {
   const webRoot = await mkdtemp(path.join(os.tmpdir(), "web-"));
   await writeFile(path.join(webRoot, "index.html"), "<!doctype html><title>t</title>");
   const store = createMemoryStore();
-  const { handle } = createHandlers({ store, webRoot });
+  const { handle } = createHandlers({ store, webRoot, allowAnonymousBulk: true });
   const call = (method, p, body, headers = {}) =>
     handle({
       method, path: p,

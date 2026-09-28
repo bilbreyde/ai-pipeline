@@ -11,7 +11,7 @@ var COLS=[
   {k:"size",l:"Deal size",num:1},{k:"margin",l:"Est. margin",num:1},
   {k:"next",l:"Next step",ns:1},{k:"close",l:"Close"},{k:"updated",l:"Updated"}
 ];
-var S={canWrite:true,me:"",bulk:false,ai:false,aiWhy:"",aiDemo:false,tab:"pipeline",loaded:false,offline:false,err:"",opps:[],settings:clone(DEFAULTS),
+var S={canWrite:true,me:"",authenticated:false,bulk:false,ai:false,aiWhy:"",aiDemo:false,tab:"pipeline",loaded:false,offline:false,err:"",opps:[],settings:clone(DEFAULTS),
   sellers:{},sort:{k:"margin",d:"desc"},f:{q:"",stage:"all",lead:"",seg:"",gaps:false},editing:null,delArmed:false};
 var chains={};
 
@@ -281,6 +281,69 @@ function updateSync(){
   ["importBtn","exportBtn"].forEach(function(id){
     var b=$(id);b.classList.toggle("off",!S.bulk);
     b.title=S.bulk?"":"Turned off until sign in is enabled. See the README, Before real customer data.";
+  });
+}
+
+/* ---------- sign in ---------- */
+function needsSignIn(){return !S.authenticated&&!S.bulk}
+function applyMe(m){
+  S.me=m.name||"";S.authenticated=!!m.authenticated;S.bulk=!!m.bulk;S.ai=!!m.ai;S.aiWhy=m.aiWhy||"";S.aiDemo=!!m.aiDemo;
+  updateSync();
+  $("signinBtn").hidden=S.authenticated;
+  $("userPill").hidden=!S.authenticated;
+}
+function refreshMe(){
+  return api("GET","/api/me").then(function(m){
+    applyMe(m);
+    if(needsSignIn())showLoginGate();else hideLoginGate();
+    return m;
+  },function(){});
+}
+function showLoginError(msg){$("loginErr").textContent=msg;$("loginErr").hidden=!msg}
+function showLoginGate(){
+  var already=!$("loginGate").hidden;
+  $("loginScrim").hidden=false;$("loginGate").hidden=false;
+  if(!already)setTimeout(function(){$("loginUser").focus()},30);
+}
+function hideLoginGate(){
+  $("loginScrim").hidden=true;$("loginGate").hidden=true;
+  $("loginErr").hidden=true;$("loginForm").reset();
+}
+function submitLogin(){
+  var u=$("loginUser").value.trim(),p=$("loginPass").value;
+  if(!u||!p){showLoginError("Enter a username and password.");return}
+  $("loginBtn").disabled=true;showLoginError("");
+  api("POST","/api/auth/login",{username:u,password:p}).then(function(){
+    $("loginBtn").disabled=false;
+    hideLoginGate();
+    refreshMe().then(load);
+  },function(e){
+    $("loginBtn").disabled=false;
+    showLoginError(errMsg(e));
+    $("loginPass").value="";
+    setTimeout(function(){$("loginPass").focus()},10);
+  });
+}
+function signOut(){
+  api("POST","/api/auth/logout",{}).then(function(){refreshMe().then(function(){if(!needsSignIn())load()})},function(){location.reload()});
+}
+function openChangePassword(){
+  $("cpForm").reset();$("cpErr").hidden=true;
+  $("cpScrim").hidden=false;$("cpModal").hidden=false;
+  setTimeout(function(){$("cpCurrent").focus()},30);
+}
+function closeChangePassword(){$("cpScrim").hidden=true;$("cpModal").hidden=true}
+function submitChangePassword(){
+  var cur=$("cpCurrent").value,next=$("cpNew").value,confirm=$("cpConfirm").value;
+  if(!cur||!next){$("cpErr").textContent="Fill in every field.";$("cpErr").hidden=false;return}
+  if(next.length<12){$("cpErr").textContent="New password must be at least 12 characters.";$("cpErr").hidden=false;return}
+  if(next!==confirm){$("cpErr").textContent="New passwords do not match.";$("cpErr").hidden=false;return}
+  $("cpSave").disabled=true;$("cpErr").hidden=true;
+  api("POST","/api/auth/change-password",{currentPassword:cur,newPassword:next}).then(function(){
+    $("cpSave").disabled=false;closeChangePassword();toast("Password changed.");
+  },function(e){
+    $("cpSave").disabled=false;
+    $("cpErr").textContent=errMsg(e);$("cpErr").hidden=false;
   });
 }
 
@@ -587,9 +650,18 @@ function bind(){
   $("sEmail").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();saveSellerEmail()}});
   $("dform").addEventListener("input",updatePreview);
   $("dform").addEventListener("submit",function(e){e.preventDefault();doSave()});
+  $("signinBtn").addEventListener("click",showLoginGate);
+  $("loginForm").addEventListener("submit",function(e){e.preventDefault();submitLogin()});
+  $("loginBtn").addEventListener("click",submitLogin);
+  $("signoutBtn").addEventListener("click",signOut);
+  $("chpwBtn").addEventListener("click",openChangePassword);
+  $("cpClose").addEventListener("click",closeChangePassword);$("cpCancel").addEventListener("click",closeChangePassword);
+  $("cpScrim").addEventListener("click",closeChangePassword);$("cpSave").addEventListener("click",submitChangePassword);
+  $("cpForm").addEventListener("submit",function(e){e.preventDefault();submitChangePassword()});
   document.addEventListener("keydown",function(e){
     if(e.key!=="Escape")return;
-    if(!$("smodal").hidden)closeSellerPrompt();else if(!$("imodal").hidden)closeImport();else if(!$("drawer").hidden)closeDrawer();
+    if(!$("cpModal").hidden)closeChangePassword();
+    else if(!$("smodal").hidden)closeSellerPrompt();else if(!$("imodal").hidden)closeImport();else if(!$("drawer").hidden)closeDrawer();
   });
   ["basisPrice","basisCost","defGm"].forEach(function(i){$(i).addEventListener("input",saveSettings);$(i).addEventListener("change",saveSettings)});
 }
@@ -616,22 +688,28 @@ function load(){
     $("banner").hidden=true;
     render();
   }).catch(function(e){
+    if(e&&e.status===403){refreshMe();return}
     S.offline=true;S.err=errMsg(e);
     showBanner(S.loaded?"Connection lost. Showing the last data received. Retrying every 20 seconds.":"Can't reach the pipeline service.",S.err);
     render(true);
   });
 }
-function busy(){return !$("drawer").hidden||!$("imodal").hidden||!$("tmodal").hidden||!$("smodal").hidden||settingsDirty||!!document.querySelector(".stage-sel:focus")}
+function busy(){return !$("drawer").hidden||!$("imodal").hidden||!$("tmodal").hidden||!$("smodal").hidden||!$("cpModal").hidden||settingsDirty||!!document.querySelector(".stage-sel:focus")}
 function init(){
   bind();
   if(location.hash==="#dashboard")setTab("dash");
   render();
   window.addEventListener("error",function(e){showBanner("Something went wrong in the page.",e.message)});
   window.addEventListener("unhandledrejection",function(e){showBanner("Something went wrong in the page.",e.reason&&e.reason.message)});
-  api("GET","/api/me").then(function(m){S.me=m.name||"";S.bulk=!!m.bulk;S.ai=!!m.ai;S.aiWhy=m.aiWhy||"";S.aiDemo=!!m.aiDemo;updateSync()},function(){});
-  load();
-  setInterval(function(){if(!document.hidden&&!busy())load()},20000);
-  document.addEventListener("visibilitychange",function(){if(!document.hidden&&!busy())load()});
+  refreshMe().then(function(){if(!needsSignIn())load()});
+  setInterval(function(){
+    if(document.hidden||busy())return;
+    if(needsSignIn())refreshMe().then(function(){if(!needsSignIn())load()});else load();
+  },20000);
+  document.addEventListener("visibilitychange",function(){
+    if(document.hidden||busy())return;
+    if(needsSignIn())refreshMe().then(function(){if(!needsSignIn())load()});else load();
+  });
 }
 /* what the transcript dialog (transcript.js) needs from this file */
 window.PipelineApp={api:api,toast:toast,esc:esc,errMsg:errMsg,load:load,parseMoney:parseMoney,full:full,openDrawer:openDrawer,shortDate:shortDate,

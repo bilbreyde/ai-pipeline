@@ -23,6 +23,11 @@
         <option value="warm">Theme: Warm, low glare</option><option value="contrast">Theme: High contrast</option>
       </select></label>
       <span class="sync" id="sync" data-state="wait"><i></i><span id="syncTxt">Connecting</span></span>
+      <button class="btn small" id="signinBtn" type="button" hidden>Sign in</button>
+      <span class="userpill" id="userPill" hidden>
+        <button class="btn small" id="chpwBtn" type="button">Change password</button>
+        <button class="btn small" id="signoutBtn" type="button">Sign out</button>
+      </span>
       <button class="btn" id="importBtn" type="button">Import</button>
       <button class="btn" id="exportBtn" type="button">Export</button>
       <button class="btn" id="txBtn" type="button">From transcript</button>
@@ -159,6 +164,38 @@
     <button class="btn" id="tmBack" type="button" hidden>Back</button>
     <button class="btn" id="tmCancel" type="button">Cancel</button>
     <span class="grow" id="tmMeta"></span>
+  </div>
+</section>
+<div id="loginScrim" hidden></div>
+<section id="loginGate" role="dialog" aria-modal="true" aria-labelledby="loginTitle" hidden>
+  <header><h2 id="loginTitle">Sign in</h2></header>
+  <div class="sm-body">
+    <p class="hint">Sign in with the account your admin created for you.</p>
+    <form id="loginForm" autocomplete="on">
+      <label class="full">Username<input type="text" id="loginUser" autocomplete="username" required></label>
+      <label class="full">Password<input type="password" id="loginPass" autocomplete="current-password" required></label>
+    </form>
+    <p class="hint err" id="loginErr" hidden></p>
+  </div>
+  <div class="dfoot">
+    <button class="btn primary" id="loginBtn" type="button">Sign in</button>
+  </div>
+</section>
+<div id="cpScrim" hidden></div>
+<section id="cpModal" role="dialog" aria-modal="true" aria-labelledby="cpTitle" hidden>
+  <header><h2 id="cpTitle">Change password</h2><button class="x" id="cpClose" type="button" aria-label="Close">&times;</button></header>
+  <div class="sm-body">
+    <form id="cpForm" autocomplete="off">
+      <label class="full">Current password<input type="password" id="cpCurrent" autocomplete="current-password" required></label>
+      <label class="full">New password<input type="password" id="cpNew" autocomplete="new-password" required minlength="12"></label>
+      <label class="full">Confirm new password<input type="password" id="cpConfirm" autocomplete="new-password" required minlength="12"></label>
+    </form>
+    <p class="hint">At least 12 characters.</p>
+    <p class="hint err" id="cpErr" hidden></p>
+  </div>
+  <div class="dfoot">
+    <button class="btn primary" id="cpSave" type="button">Save</button>
+    <button class="btn" id="cpCancel" type="button">Cancel</button>
   </div>
 </section>
 <div id="toast" role="status" hidden></div>

@@ -8,33 +8,34 @@ AI Practice Pipeline tracker for Zones LLC. One Azure Function App (Flex Consump
 
 ## Hard rules
 
-1. **Customer data stays in the Zones tenant.** Never send it to any third party, never commit it. The real workbook lives outside the repo. `.gitignore` blocks xlsx, xls and csv. Fictional sample data only until sign in is enabled.
-2. **No secrets.** Cosmos has `disableLocalAuth: true`. Do not turn key auth on, do not add connection strings or keys to app settings, code, or scripts. Auth is managed identity in Azure and `az login` locally, both through DefaultAzureCredential.
-3. **Verify the tenant before every `az` command that changes something.** Run `az account show` and compare tenant and subscription to what the user gave you. `scripts/deploy.ps1` already enforces this. Do not bypass it.
+1. **Customer data stays in the Zones tenant.** Never send it to any third party, never commit it. The real workbook lives outside the repo. `.gitignore` blocks xlsx, xls and csv. Fictional sample data only until the README "Before real customer data" steps are done and the user confirms.
+2. **No secrets.** Cosmos has `disableLocalAuth: true`. Do not turn key auth on, do not add connection strings or keys to app settings, code, or scripts. Auth is managed identity in Azure and `az login` locally, both through DefaultAzureCredential. Password hashes are not secrets in this sense (they are meant to sit in Cosmos), but never log a password or a session token.
+3. **Verify the tenant before every `az` command that changes something.** Run `az account show` and compare tenant and subscription to what the user gave you. `scripts/deploy.ps1` already enforces this, and so does `scripts/manage-users.mjs` by way of `scripts/env.mjs`. Do not bypass it.
 4. **Node 24 or later.** Never Node 20. PowerShell on Windows is the shell.
-5. No sign in yet by design (MVP). Do not import real data until the README "Before real customer data" steps are done and the user confirms.
-6. Import and export are refused unless a user is signed in (`x-ms-client-principal-name` present). `ALLOW_ANONYMOUS_BULK=true` lifts that for testing with fictional data only. Never set it while real data is in Cosmos, and never make it the default.
+5. **Sign in is real and on by default.** Username and password, not Entra (this dev tenant has no app registration available). Every `/api/*` route except `health` and `me` refuses an anonymous caller unless `allowAnonymousBulk` is set. `ALLOW_ANONYMOUS_BULK=true` lifts that for local testing and CI with fictional data only. Never set it on the deployed app, and never make it the default there.
+6. **No admin role and no user management UI in the app, on purpose.** Do not add one. Accounts are created, reset and revoked only by `scripts/manage-users.mjs`, run locally against Cosmos with `az login`, the same trust boundary as `seed-sample.mjs`. If asked to add "an admin page" or "a way to manage users in the app," point back to this rule and the README's Sign in section instead of building it.
 7. Transcript analysis may call only the Microsoft Foundry resource inside the Zones tenant, with Entra ID (managed identity). Never add another model provider, an API key, or a call that sends transcript text anywhere else. The transcript itself is never stored or logged. Logs carry lengths and counts only.
 
 ## Commands
 
 ```powershell
 npm ci
-npm test                       # 112 tests, no Azure needed
+npm test                       # 137 tests, no Azure needed
 npm run dev                    # local server, in memory, http://localhost:7071
 ./scripts/deploy.ps1 -TenantId <tid> -SubscriptionId <sid>
 ./scripts/deploy.ps1 -TenantId <tid> -SubscriptionId <sid> -SkipInfra   # code only
 npm run seed:sample
+npm run users create <username>   # first account after a fresh deploy; see README Sign in
 ```
 
 ## Architecture notes
 
 * `src/lib/handlers.js` holds all routing, validation calls and security headers. `src/functions/router.js` is a thin adapter with one catch all route. `dev/server.mjs` and the tests call the same `handle()`.
 * `host.json` sets `routePrefix` to an empty string so `/` serves the page and `/api/*` the API.
-* Cosmos container `items`, partition key `/type` (`opp`, `settings` or `sellers`). Updates read, merge, then replace with an etag and retry on conflict.
+* Cosmos container `items`, partition key `/type` (`opp`, `settings`, `sellers`, `user` or `session`). Updates read, merge, then replace with an etag and retry on conflict.
 * `src/lib/xlsx.js` owns spreadsheet export and import. `exceljs` is loaded with a dynamic `import()` inside its functions so ordinary page loads never pay for it. Import is parse, plan (read only), then apply, and apply re-parses the upload rather than trusting the preview. Updates go through `src/lib/mutate.js` (`mergeUpdate`), the same etag retry path as PATCH. Import never deletes.
 * `web/dash-calc.js` is the single source of margin math (`marginOf`, `gapsOf`, rollups). `web/app.js` delegates to it, so the table and the Dashboard cannot disagree. It has no DOM access and is unit tested in Node through `vm`. Change math there, never in `app.js` or `dash.js`. There is no weighted margin or win probability: forecasting is a sales function, not something this tracker computes.
-* `STAGES` and `OPEN` are defined once in `web/dash-calc.js` (chart math) and again in `src/lib/validate.js` (API validation, and `src/lib/xlsx.js`'s dropdown reads this one). `web/app.js` keeps its own `STAGES` and `OPEN` for the table's stage picker, filter, sort order and the Pipeline tab's by stage bars (it delegates the math to `dash-calc.js`, not these arrays). `web/transcript-ui.js` keeps its own `STAGES` for the transcript review dropdown, since it has no import step. Adding, removing or reordering a stage means editing all four, in that order, then giving each open stage a colour token in `STAGE_CLS` in `web/dash.js` (a missing entry gets no colour class, so its bar has no colour of its own), then updating the tests that assert `byStage` key order.
+* `STAGES` and `OPEN` are defined once in `web/dash-calc.js` (chart math) and again in `src/lib/validate.js` (API validation, and `src/lib/xlsx.js`'s dropdown reads this one). `web/transcript-ui.js` keeps its own copy for the transcript review dropdown, since it has no import step. Adding, removing or reordering a stage means editing all three, in that order, then updating the tests that assert `byStage` key order.
 * `web/dash.js` builds charts as inline SVG with `createElementNS` and `textContent`. No chart library, no `innerHTML` with data. Marks are at most 24px thick with a 4px rounded data end and a 2px gap between stacked segments. Every card has a Table view twin, so a tooltip is never the only way to read a value.
 * Themes are `data-theme` on `<html>` (light, dark, warm, contrast). No attribute means follow the OS. `web/theme.js` is a separate synchronous script in `<head>` (CSP forbids inline script) so the page never flashes the wrong theme. `test/theme-contrast.test.mjs` parses the real `app.css` and asserts WCAG ratios per theme, so a token edit that hurts readability fails `npm test`.
 * Chart colours are tokens (`--c1`, `--c2`, `--cg`, `--o1` to `--o4`). Do not add a ninth categorical hue. Orange on the warm and high contrast surfaces is 2.89:1, which is relieved by direct labels and the Table view. Hatch texture is only on for High contrast and print.
@@ -44,6 +45,7 @@ npm run seed:sample
 * Apply for an update sends `baseUpdatedAt`. `mergeUpdate` accepts a function patch so the stale check and the history append run against the freshly read row on every etag retry. A changed row returns 409.
 * `dev/mock-ai.mjs` is a regex stand in for the model. `npm run dev` uses it unless `FOUNDRY_ENDPOINT` and `FOUNDRY_DEPLOYMENT` are set, and the page shows a demo banner (`/api/me` returns `aiDemo`). Tests inject fake models and a fake `fetch`, so nothing touches Azure.
 * CSP is strict: scripts and styles from self only. Do not add CDN links or inline scripts. Fonts are system fonts on purpose.
+* **Sign in.** `src/lib/auth.js` has the hashing (`scrypt`), session tokens, lockout and cookie helpers; `src/lib/handlers.js` has `resolveActor` (session cookie, then `x-ms-client-principal-name`), `login`/`logout`/`changePassword`, and the `PUBLIC_RESOURCES` gate in `handleApi` that blocks every route except `health`, `me`, `auth/login` and `auth/logout` when there is no actor and `allowAnonymousBulk` is off. **Trap:** a new API resource is blocked by this gate automatically, which is what you want, but every test `setup()`/`seeded()` helper that exercises plain CRUD, not sign in itself, needs `allowAnonymousBulk: true` passed to `createHandlers`, the same way `dev/server.mjs` defaults it on. `test/auth.test.mjs` is the one file that turns it off on purpose, to test the gate. Accounts have no in app UI; see Hard rule 6 and `scripts/manage-users.mjs`.
 * **Request update.** `GET /api/sellers` and `POST /api/sellers` (`{name, email}`, validated by `validateSeller` in `src/lib/validate.js`) read and write one small directory document, the same singleton pattern as settings (`store.getSellerDirectory`/`putSellerDirectory`, one Cosmos doc keyed by the lower cased seller name). Neither route sends anything anywhere: `web/app.js` builds a `mailto:` link client side and clicks a throwaway anchor to open it in the person's own mail client. There is no email service in this app, on purpose, so there is nothing to configure and nothing that can spam a seller on its own: someone has to see the draft and hit send. Do not add a real send path (Communication Services, Graph `sendMail`, anything else) without deciding, as a Zones question and not a code one, who it sends as and where quota and cost land.
 
 ## Not verified from the authoring environment (no az, no Bicep, no Azure access there)
@@ -69,6 +71,14 @@ The API, UI, importer mapping and tests were run for real against an in memory s
 14. **Reasoning models.** The default model (`gpt-5.4-mini`) is a reasoning model. Hidden reasoning tokens count against `max_completion_tokens`, so `src/lib/ai.js` and `transcript-analysis.js` ask for 16000, and `FOUNDRY_REASONING_EFFORT=low` (set by the script) is sent as `reasoning_effort`. The client drops `reasoning_effort` on a 400 that names it, which covers a non reasoning model and a level the model does not accept. Only a real run shows whether `low` gives enough quality and how long it takes. If a proposal misses fields, try `medium` before switching models. The model name, version and Data Zone SKU the script picked come from `az cognitiveservices model list`, so confirm them in the DryRun output rather than trusting the defaults in this file.
 15. **Swapping models.** Rerun `scripts/setup-foundry.ps1 -Model <name>`. The default deployment name includes the model, so a new model gets a new deployment and the app is repointed. The script refuses to reuse a deployment name that runs a different model. It prints, and never runs, the delete command for the old deployment.
 
-## When hardening (adding sign in)
+## Not verified from the authoring environment, sign in edition
 
-Follow the README. The API reads the user from `x-ms-client-principal-name`, which App Service Authentication sets. If you later move to Static Web Apps with a linked Function App, the page and API paths do not change. Microsoft's docs do not confirm Flex Consumption as a linked backend, so test that link before committing to it.
+`scripts/manage-users.mjs` was exercised against the in memory store (`test/auth.test.mjs`) and, standalone, against a fake `az`, the same way `seed-sample.mjs` was before its first real run. Never against real Cosmos. On first use after deploy, expect to check:
+
+16. **`create` and `reset-password` actually reach Cosmos.** Confirm with `npm run users list` right after, and confirm the printed password really signs in through the deployed page, not just against the local dev server.
+17. **Cosmos role propagation applies here too.** The same role that lets `seed:sample` write opportunities is what lets `manage-users.mjs` write `user` documents. A 403 right after deploy is the propagation delay in item 5 above, not a bug in the script.
+18. **Cookies over the real domain.** `secureCookies` defaults to `true` in `src/functions/router.js` (unset there), which requires https. Confirm the deployed Function App is only ever reached over https (Flex Consumption is https only by default) before relying on sign in actually protecting anything; an http origin would silently drop the cookie.
+
+## If you later move to Static Web Apps or add Entra
+
+Follow the README's Sign in section for the Entra upgrade path: `resolveActor` already checks `x-ms-client-principal-name` as a fallback after the session cookie, so turning on App Service Authentication needs no code change. If you move to Static Web Apps with a linked Function App, the page and API paths do not change. Microsoft's docs do not confirm Flex Consumption as a linked backend, so test that link before committing to it.

@@ -368,6 +368,8 @@ table.dt tbody tr:hover{background:transparent}
 :root[data-theme="contrast"] #imodal,
 :root[data-theme="contrast"] #tmodal,
 :root[data-theme="contrast"] #smodal,
+:root[data-theme="contrast"] #loginGate,
+:root[data-theme="contrast"] #cpModal,
 :root[data-theme="contrast"] #drawer,
 :root[data-theme="contrast"] #tip,
 :root[data-theme="contrast"] select,
@@ -402,7 +404,7 @@ table.dt tbody tr:hover{background:transparent}
     color-scheme:light;
   }
   body{background:#fff}
-  .top-actions,.tabs,.dash-filters,.tbl-toggle,#toast,#drawer,#imodal,#tmodal,#smodal,#scrim,#iscrim,#tscrim,#sscrim,.banner,#tip{display:none!important}
+  .top-actions,.tabs,.dash-filters,.tbl-toggle,#toast,#drawer,#imodal,#tmodal,#smodal,#scrim,#iscrim,#tscrim,#sscrim,#loginGate,#loginScrim,#cpModal,#cpScrim,.banner,#tip{display:none!important}
   .card,.kpis{break-inside:avoid}
   .app{padding-block:0;max-width:none}
   .chart .mark.tx.c1{fill:url(#tx-c1)}
@@ -429,8 +431,16 @@ table.dt tbody tr:hover{background:transparent}
 #smodal{position:fixed;z-index:65;top:50%;left:50%;transform:translate(-50%,-50%);width:min(420px,calc(100% - 32px));background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);display:flex;flex-direction:column}
 .sm-body{padding:16px 20px;display:flex;flex-direction:column;gap:10px}
 .sm-body label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:var(--ink-2)}
+.sm-body form{display:flex;flex-direction:column;gap:10px}
 .sm-body .hint{margin:0}
 .sm-body .hint.err{color:var(--crit)}
+
+/* sign in gate and change password dialog: same box as the seller email dialog */
+#loginScrim,#cpScrim{position:fixed;inset:0;background:rgba(6,12,26,.5);z-index:75}
+#loginGate,#cpModal{position:fixed;z-index:80;top:50%;left:50%;transform:translate(-50%,-50%);width:min(380px,calc(100% - 32px));background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);display:flex;flex-direction:column}
+#loginGate header,#cpModal header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line)}
+#loginGate header h2,#cpModal header h2{margin:0;font-size:16px}
+.userpill{display:inline-flex;gap:8px;align-items:center;margin-right:4px}
 
 /* transcript dialog */
 #tmodal{position:fixed;z-index:65;top:50%;left:50%;transform:translate(-50%,-50%);width:min(820px,calc(100% - 32px));max-height:calc(100% - 32px);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);display:flex;flex-direction:column}

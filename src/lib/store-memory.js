@@ -5,6 +5,8 @@ import { ConflictError } from "./errors.js";
 
 export function createMemoryStore() {
   const opps = new Map();
+  const users = new Map();
+  const sessions = new Map();
   let settings = null;
   let sellers = null;
   let etagSeq = 0;
@@ -62,6 +64,51 @@ export function createMemoryStore() {
     async putSellerDirectory(value) {
       sellers = copy(value);
       return copy(sellers);
+    },
+
+    /** Users and sessions. Accounts are managed by scripts/manage-users.mjs; the running app only signs in, signs out and changes your own password. */
+    async getUser(username) {
+      const r = users.get(username);
+      return r ? copy(r) : null;
+    },
+
+    async putUser(user) {
+      users.set(user.id, copy(user));
+      return copy(user);
+    },
+
+    async deleteUser(username) {
+      return users.delete(username);
+    },
+
+    async listUsers() {
+      return [...users.values()].map(copy);
+    },
+
+    async getSession(token) {
+      const r = sessions.get(token);
+      return r ? copy(r) : null;
+    },
+
+    async putSession(session) {
+      sessions.set(session.id, copy(session));
+      return copy(session);
+    },
+
+    async deleteSession(token) {
+      return sessions.delete(token);
+    },
+
+    /** Deletes every session for this username, except the token in `except`. Returns how many went. */
+    async deleteSessionsFor(username, { except } = {}) {
+      let n = 0;
+      for (const [token, s] of sessions) {
+        if (s.username === username && token !== except) {
+          sessions.delete(token);
+          n++;
+        }
+      }
+      return n;
     },
   };
 }

@@ -17,7 +17,11 @@ const allowAnonymousBulk = process.env.ALLOW_ANONYMOUS_BULK === "true";
 
 app.http("router", {
   methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"],
-  authLevel: "anonymous", // Sign in is added at the platform layer (App Service authentication), not here.
+  // Anonymous at the Functions layer on purpose: sign in is enforced inside createHandlers (see
+  // src/lib/auth.js and handleApi's PUBLIC_RESOURCES gate), not by Azure. If App Service
+  // Authentication with Entra is turned on later, its x-ms-client-principal-name header is picked
+  // up automatically (resolveActor checks it as a fallback), no code change needed.
+  authLevel: "anonymous",
   route: "{*rest}",
   handler: async (request, context) => {
     if (!api) {

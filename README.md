@@ -2,7 +2,7 @@
 
 A shared tracker for the Zones and Thoughtworks AI practice pipeline. Opportunities, stages, deal size, estimated margin, data gap flags, and a plain warning when one deal dominates the total. It replaces the Excel tracker and the Power BI attempt with something people edit directly.
 
-**Status: beta. No sign in yet. Fictional sample data only.**
+**Status: beta. Username and password sign in. Fictional sample data only.**
 
 ## Architecture
 
@@ -31,9 +31,11 @@ The page and the API are decoupled (the page only calls relative `/api/...` URLs
 | `src/functions/router.js` | The thin Azure Functions adapter. |
 | `src/lib/store-cosmos.js` | Cosmos access with Entra ID only. |
 | `src/lib/validate.js` | Field rules for opportunities, settings and the seller directory. |
+| `src/lib/auth.js` | Username and password sign in: hashing, sessions, lockout, cookies. See Sign in below. |
 | `infra/main.bicep` | Function App, Cosmos, storage, monitoring, role assignments. |
 | `scripts/deploy.ps1` | Tenant guarded deploy. |
 | `scripts/seed-sample.mjs` | Loads fictional demo rows. |
+| `scripts/manage-users.mjs` | Create, reset, unlock and revoke accounts. See Sign in below. |
 | `src/lib/xlsx.js` | Spreadsheet export, and the import parser, planner and writer. Used by the page and the script. |
 | `src/lib/transcript.js` | Reads pasted text, .txt, .vtt, .srt and .docx into plain text. |
 | `src/lib/transcript-analysis.js` | The prompt, the answer schema, and the checks that turn a model answer into a reviewable proposal. |
@@ -51,7 +53,9 @@ npm test
 npm run dev          # http://localhost:7071, in memory, fictional data
 ```
 
-`DEV_USER=you@example.com npm run dev` simulates a signed in user so you can see the audit fields.
+`DEV_USER=you@example.com npm run dev` simulates a signed in user (the Entra header) so you can see the audit fields, without going through the sign in screen.
+
+`DEV_LOGIN_USER=don DEV_LOGIN_PASSWORD=something-long-enough npm run dev` instead creates a real account in the in memory store, so you can try the actual sign in screen, lockout, and change password, with no Cosmos needed. `npm run dev` on its own leaves pipeline data open (`ALLOW_ANONYMOUS_BULK` defaults on locally), so you do not have to sign in at all just to look at the tracker; add `ALLOW_ANONYMOUS_BULK=false` to see the sign in gate the deployed app shows by default.
 
 ## Deploy
 
@@ -65,6 +69,28 @@ npm run seed:sample
 The script will not use whatever `az` happens to be logged into. It switches to the tenant and subscription you pass, prints what it resolved, and makes you type the subscription name before it changes anything. It ends with a health check that expects `store: cosmos`. Rerun with `-SkipInfra` to redeploy code only.
 
 The Cosmos data role for you personally is assigned during deploy and can take a few minutes to propagate. A 403 from `seed:sample` right after deploy means wait and rerun.
+
+## Sign in
+
+This is a dev tenant with no app registration available, so there is no Entra ID sign in here, only a real username and password per person. The app enforces it itself: every `/api/*` route except `health` and `me` refuses an anonymous request (`403 Sign in to see or change pipeline data.`), so once this is deployed nobody can read or change data without an account, with no App Service Authentication needed in front of it.
+
+There is deliberately no admin role and no user management screen in the app. Accounts are created, reset, and revoked with `scripts/manage-users.mjs`, run from your own machine against Cosmos with your own `az login` session, the same trust boundary `scripts/seed-sample.mjs` already uses: whoever can reach Cosmos controls who can sign in.
+
+```powershell
+node scripts/manage-users.mjs create don               # prints a generated password, shown once
+node scripts/manage-users.mjs reset-password don        # forgot it, or handing the account to someone new; also signs out its open sessions
+node scripts/manage-users.mjs unlock don                 # clears a lockout early, instead of waiting 15 minutes
+node scripts/manage-users.mjs revoke don --confirm       # deletes the account; any open session for it stops working on its next request
+node scripts/manage-users.mjs list                       # who has an account, and who is currently locked out
+```
+
+**Create the first account right after you deploy.** `ALLOW_ANONYMOUS_BULK` is off by default, so a fresh deployment has sign in required and, until you run `create`, nobody, including you, can sign in. Run `npm run users create <you>` (an alias for the command above) as the last step of standing this up, before sending the URL to anyone.
+
+In the browser: Sign in top right, or a full sign in screen if the whole app requires it. Once signed in you get Change password and Sign out next to it. Changing your password signs out every other session for your account; the one you changed it from stays signed in. A locked out account (5 wrong passwords in a row) gives the same generic "Invalid username or password" as a wrong password, for 15 minutes, so a login attempt never reveals whether an account exists.
+
+Under the hood: passwords are hashed with Node's built in `scrypt`, never logged or stored in the clear. A session is an opaque random token, not a signed one, stored in Cosmos and looked up on every request, which is what makes `revoke` an immediate, real revocation instead of a rotate-the-signing-key exercise. The session cookie is `HttpOnly`, `SameSite=Strict`, `Secure` everywhere except plain http local dev, and lasts 24 hours from sign in.
+
+If this ever moves to a tenant where an Entra app registration is possible, turning on App Service Authentication needs no code change: `resolveActor` already checks for the `x-ms-client-principal-name` header Entra sets, it is just second, after the session cookie, in what it checks.
 
 ## Themes and Dashboard
 
@@ -124,7 +150,7 @@ This needs nothing new in Azure: no email service, no secrets, no new role assig
 
 ## Import and export
 
-The page has Export and Import buttons. Both are turned off until a user is signed in, because each moves the whole data set in one request and the beta has no sign in. They work locally (`npm run dev`) because the dev server has fictional data only.
+The page has Export and Import buttons. Both are turned off until a user is signed in, because each moves the whole data set in one request. They work locally (`npm run dev`) without signing in because the dev server defaults to open, fictional data only (see Sign in above).
 
 **Export** downloads `ai-pipeline-YYYY-MM-DD.xlsx` with two sheets. `Pipeline` has one row per opportunity, dropdowns on Stage, Lead and Thoughtworks, and a live formula for Est. margin. `Assumptions` holds the margin basis and default GM those formulas read, plus open pipeline totals. Changing Assumptions in Excel changes that workbook only. The app does not read them back.
 
@@ -133,7 +159,7 @@ The page has Export and Import buttons. Both are turned off until a user is sign
 * **An export from this page.** Rows are matched by the Id column, or by account plus opportunity if Id is blank. Matched rows are updated, and a blank cell clears that field. Rows with no match are added. Edit in Excel, add rows, re-import.
 * **The original AI Practice Progress Sheet** (an `Accounts` tab). Status text is mapped to stages by wording, `(100)` is read as $100K and flagged. This layout only adds new accounts. Anything already in the tracker is left alone, so re-running it cannot revert edits your team made in the app.
 
-Limits: 1,000 rows and 4 MB per file, .xlsx only (no .xls or CSV). Test the buttons on the deployed beta with fictional data only:
+Limits: 1,000 rows and 4 MB per file, .xlsx only (no .xls or CSV). Sign in and both buttons work; see Sign in above for creating an account. To test them on the deployed beta without creating an account yet, fictional data only:
 
 ```powershell
 # Confirm you are in the right tenant and subscription first: az account show
@@ -141,8 +167,6 @@ az functionapp config appsettings set -g rg-zones-ai-pipeline -n <FUNCTION_APP_N
 # When done testing, remove it:
 az functionapp config appsettings delete -g rg-zones-ai-pipeline -n <FUNCTION_APP_NAME> --setting-names ALLOW_ANONYMOUS_BULK
 ```
-
-Once sign in is on, no setting is needed. Anyone who is signed in can import and export.
 
 ## Margin, so nobody is surprised
 
@@ -154,12 +178,13 @@ Resale heavy deals (hardware, licences) do not carry consulting margins. Set a r
 
 ## Before real customer data
 
-The beta has no sign in. Anyone with the URL can read and edit. Do these in order, then import:
+Sign in is already required by default (see Sign in above), so this is shorter than it used to be. Do these in order, then import:
 
-1. Turn on App Service Authentication on the Function App with the Microsoft provider, single tenant (issuer `https://login.microsoftonline.com/<tenant-id>/v2.0`), unauthenticated requests redirected to login. No code change is needed. The API already records the signed in user from the `x-ms-client-principal-name` header.
-2. In Entra, open the app's enterprise application, set **Assignment required** to Yes, and assign a security group. Without this, every user in the tenant can sign in.
-3. Consider Cosmos private endpoint plus VNet integration on the Function App, then set Cosmos public network access to disabled.
-4. Import the workbook, from the page (Import button) or the script. It stays outside the repo. The page shows a preview first. The script does a dry run first and prints counts only:
+1. Make sure `ALLOW_ANONYMOUS_BULK` is not set on the Function App (it should never have been set there; it is a local testing escape hatch only). Confirm with `az functionapp config appsettings list`.
+2. Create a real account for everyone who should have access, with `scripts/manage-users.mjs create`, and only for them. Revoke anything you created for testing (`revoke --confirm`) or reset its password before real data goes in.
+3. If this ever moves to a tenant where an Entra app registration is possible, App Service Authentication can be turned on in front of the Function App with no code change (see Sign in above); until then, the username and password accounts above are the access control.
+4. Consider Cosmos private endpoint plus VNet integration on the Function App, then set Cosmos public network access to disabled.
+5. Import the workbook, from the page (Import button) or the script. It stays outside the repo. The page shows a preview first. The script does a dry run first and prints counts only:
 
 ```powershell
 node scripts/import-from-excel.mjs "C:\path\to\AI Practice Progress Sheet.xlsx"

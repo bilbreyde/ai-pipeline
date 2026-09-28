@@ -11,6 +11,8 @@ const SETTINGS = "settings";
 const SETTINGS_ID = "config";
 const SELLERS = "sellers";
 const SELLERS_ID = "directory";
+const USER = "user";
+const SESSION = "session";
 
 const isStatus = (e, code) => e && (e.code === code || e.statusCode === code);
 
@@ -111,6 +113,77 @@ export function createCosmosStore({ endpoint, database, container }) {
     async putSellerDirectory(value) {
       await c.items.upsert({ ...value, id: SELLERS_ID, type: SELLERS });
       return value;
+    },
+
+    /** Users and sessions. Accounts are managed by scripts/manage-users.mjs; the running app only signs in, signs out and changes your own password. */
+    async getUser(username) {
+      try {
+        const { resource } = await c.item(username, USER).read();
+        return resource ? toPublic(resource) : null;
+      } catch (e) {
+        if (isStatus(e, 404)) return null;
+        throw e;
+      }
+    },
+
+    async putUser(user) {
+      const { resource } = await c.items.upsert({ ...user, type: USER });
+      return toPublic(resource);
+    },
+
+    async deleteUser(username) {
+      try {
+        await c.item(username, USER).delete();
+        return true;
+      } catch (e) {
+        if (isStatus(e, 404)) return false;
+        throw e;
+      }
+    },
+
+    async listUsers() {
+      const { resources } = await c.items
+        .query({ query: "SELECT * FROM c WHERE c.type = @t", parameters: [{ name: "@t", value: USER }] }, { partitionKey: USER })
+        .fetchAll();
+      return resources.map(toPublic);
+    },
+
+    async getSession(token) {
+      try {
+        const { resource } = await c.item(token, SESSION).read();
+        return resource ? toPublic(resource) : null;
+      } catch (e) {
+        if (isStatus(e, 404)) return null;
+        throw e;
+      }
+    },
+
+    async putSession(session) {
+      const { resource } = await c.items.upsert({ ...session, type: SESSION });
+      return toPublic(resource);
+    },
+
+    async deleteSession(token) {
+      try {
+        await c.item(token, SESSION).delete();
+        return true;
+      } catch (e) {
+        if (isStatus(e, 404)) return false;
+        throw e;
+      }
+    },
+
+    /** Deletes every session for this username, except the token in `except`. Returns how many went. */
+    async deleteSessionsFor(username, { except } = {}) {
+      const { resources } = await c.items
+        .query({ query: "SELECT c.id FROM c WHERE c.type = @t AND c.username = @u", parameters: [{ name: "@t", value: SESSION }, { name: "@u", value: username }] }, { partitionKey: SESSION })
+        .fetchAll();
+      let n = 0;
+      for (const { id } of resources) {
+        if (id === except) continue;
+        if (await this.deleteSession(id)) n++;
+      }
+      return n;
     },
   };
 }

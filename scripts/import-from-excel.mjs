@@ -9,8 +9,9 @@
 // 2. Output is counts and row numbers only, never account names.
 // 3. The dry run needs no Azure access and plans against an empty tracker, so "new" means "new if empty".
 //    --apply plans against what is really in Cosmos.
-// 4. --apply refuses to run without --confirm-secured. That flag is you saying sign in is enabled on the app
-//    and this is a tenant approved place for customer data. The MVP has no sign in.
+// 4. --apply refuses to run without --confirm-secured. That flag is you saying every account on the app belongs
+//    to someone who should have it (see scripts/manage-users.mjs) and this is a tenant approved place for
+//    customer data. Sign in itself is always on; this flag is about who has an account, not whether one is needed.
 
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";

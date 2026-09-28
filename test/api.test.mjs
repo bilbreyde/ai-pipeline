@@ -7,14 +7,17 @@ import { createHandlers } from "../src/lib/handlers.js";
 import { createMemoryStore } from "../src/lib/store-memory.js";
 import { ConflictError } from "../src/lib/errors.js";
 
-async function setup() {
+// allowAnonymousBulk defaults on here so the many tests below that exercise plain CRUD, not sign
+// in itself, don't all need to pass a header. The one test that cares about the signed out
+// experience (below) turns it off explicitly.
+async function setup({ allowAnonymousBulk = true } = {}) {
   const webRoot = await mkdtemp(path.join(os.tmpdir(), "web-"));
   await writeFile(path.join(webRoot, "index.html"), "<!doctype html><title>t</title>");
   await writeFile(path.join(webRoot, "app.js"), "console.log(1)");
   await writeFile(path.join(webRoot, "app.css"), "body{}");
   await writeFile(path.join(webRoot, "secret.txt"), "nope");
   const store = createMemoryStore();
-  const { handle } = createHandlers({ store, webRoot });
+  const { handle } = createHandlers({ store, webRoot, allowAnonymousBulk });
   const call = (method, p, body, headers = {}) =>
     handle({
       method, path: p,
@@ -168,7 +171,7 @@ test("static files: whitelist only, no traversal, security headers present", asy
 });
 
 test("me reflects the sign in header", async () => {
-  const { call } = await setup();
+  const { call } = await setup({ allowAnonymousBulk: false });
   assert.deepEqual(json(await call("GET", "/api/me")), { name: "", authenticated: false, bulk: false, ai: false, aiWhy: "signin" });
   assert.deepEqual(json(await call("GET", "/api/me", undefined, { "x-ms-client-principal-name": "don@example.com" })), { name: "don@example.com", authenticated: true, bulk: true, ai: false, aiWhy: "not-configured" });
 });
