@@ -142,7 +142,7 @@ Deployments are named after the model (`transcripts-gpt-5-4-mini`), so the name 
 
 ## Request update from the seller
 
-Open an opportunity and click **Request update**. If the seller has an email on file, a draft opens in your own mail client, addressed to them, with the account, stage, expected close and next step already filled in. You review it and send it yourself, from your own mailbox. Nothing here sends mail automatically and nothing is queued: the button only builds a `mailto:` link.
+Open an opportunity and click **Request update**. If the seller has an email on file, a draft opens in your own mail client, addressed to them, with a summary of everything the tracker has on that deal: account, stage, deal size, expected close, next step, and segment or lead if set. Any of deal size, expected close or next step that is blank is shown as "Not on file", and the opening line asks the seller to fill those in, so a stale or missing field gets fixed instead of quietly staying wrong. When nothing is missing, it just asks them to confirm the summary. At Account planning no size or close date is expected, so those two appear only if set and are never chased. You review the draft and send it yourself, from your own mailbox. Nothing here sends mail automatically and nothing is queued: the button only builds a `mailto:` link.
 
 The first time you use it for a given seller, you are asked for their email once. It is saved to a small seller directory (name to email), not copied onto every opportunity row, so the next request for that seller, on any deal, needs no prompt. The Seller field itself stays free text; the match against the directory ignores case, so "Avery" and "avery" are the same seller.
 

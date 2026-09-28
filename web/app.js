@@ -409,15 +409,29 @@ function loadHistory(o){
 /* Nothing here sends mail. A mailto: link opens the person's own mail client with the seller's address,
    a subject and a body already filled in; they review it and send it themselves, from their own mailbox.
    The only thing the server stores is the seller's email address, once, in the seller directory. */
+/* Summarizes exactly what the tracker has on file, including "Not on file" for the fields we ask
+   sellers to fill in most often, so a stale or blank field gets fixed instead of silently staying
+   wrong. Segment and lead are left out when blank; they are classification, not something we chase.
+   At Account planning no size or close is expected (dash-calc.js does not count it as a gap), so those
+   two are shown only when set, never chased. The opening line asks to fill gaps only when there are some. */
 function updateMailBody(d){
-  var lines=["Hi "+(d.seller||"")+",","","Could you send a quick status update on this one when you get a chance?",""];
-  lines.push("Account: "+(d.account||""));
-  if(d.opportunity)lines.push("Opportunity: "+d.opportunity);
-  lines.push("Stage: "+d.stage);
-  if(d.closeDate)lines.push("Expected close: "+shortDate(d.closeDate));
-  if(d.nextStep)lines.push("Next step on file: "+d.nextStep);
-  lines.push("","Thanks!");
-  return lines.join("\n");
+  var NA="Not on file",planning=d.stage==="Account planning",body=[],missing=false;
+  function field(label,value,chase){
+    if(value)body.push(label+": "+value);
+    else if(chase){body.push(label+": "+NA);missing=true}
+  }
+  body.push("Account: "+(d.account||""));
+  if(d.opportunity)body.push("Opportunity: "+d.opportunity);
+  body.push("Stage: "+d.stage);
+  field("Deal size",d.size==null?"":full(d.size),!planning);
+  field("Expected close",d.closeDate?shortDate(d.closeDate):"",!planning);
+  field("Next step",d.nextStep,true);
+  if(d.segment)body.push("Segment: "+d.segment);
+  if(d.lead)body.push("Lead: "+d.lead);
+  var ask=missing
+    ?"Here's what we have on file for this one. Could you confirm it's accurate, and fill in anything below marked "+NA+"?"
+    :"Here's what we have on file for this one. Could you confirm it's still accurate?";
+  return ["Hi "+(d.seller||"")+",","",ask,""].concat(body,["","Thanks!"]).join("\n");
 }
 function openUpdateMail(d,email){
   var subject="Status update: "+(d.account||"opportunity")+(d.opportunity?" ("+d.opportunity+")":"");
