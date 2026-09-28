@@ -183,18 +183,15 @@ details.assump{background:var(--surface);border:1px solid var(--line);border-rad
 details.assump summary{cursor:pointer;padding:12px 20px;font-weight:600;font-size:13px;list-style:none;display:flex;justify-content:space-between;gap:12px;align-items:center}
 details.assump summary::-webkit-details-marker{display:none}
 details.assump summary small{font-weight:400;color:var(--ink-3);font-size:12px}
-.assump-body{padding:4px 20px 20px;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:24px}
-@media (max-width:900px){.assump-body{grid-template-columns:1fr}}
+.assump-body{padding:4px 20px 20px;display:grid;grid-template-columns:minmax(0,560px);gap:24px}
 .assump-body h3{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin:0 0 10px;font-weight:600}
 .radio{display:flex;gap:10px;align-items:flex-start;padding:9px 0;cursor:pointer;font-size:13px}
 .radio input{margin-top:3px}
 .radio small{display:block;color:var(--ink-3);font-size:12px;margin-top:1px}
 .inline-num{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px}
 .inline-num input{width:72px}
-.probs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px 14px}
-.probs label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink-2)}
 input[type=number],input[type=text],input[type=date],input[type=search],select,textarea{border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:7px 9px;font-size:13px;width:100%}
-.inline-num input[type=number],.probs input{width:100%}
+.inline-num input[type=number]{width:100%}
 .hint{font-size:12px;color:var(--ink-3);margin:10px 0 0}
 
 /* drawer */

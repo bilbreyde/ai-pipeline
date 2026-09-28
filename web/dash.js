@@ -117,12 +117,11 @@ function bindTip(node, d) {
 /* ---------- chart primitives ---------- */
 /** What to print at a bar tip. Zero deals and deals without a size are different facts, so they read differently. */
 function valText(g, m) { return g.n === 0 ? "None" : g.sized === 0 ? "No size" : C.compact(g[m]); }
-function measureRows(g, st) {
+function measureRows(g) {
   return [
     { k: "Deals", v: String(g.n) },
     { k: "Deal size", v: C.full(g.size) },
-    { k: "Estimated margin", v: C.full(g.margin) },
-    { k: "Weighted margin", v: C.full(g.weighted) }
+    { k: "Estimated margin", v: C.full(g.margin) }
   ].concat(g.unsized ? [{ k: "Without a size", v: String(g.unsized) }] : []);
 }
 
@@ -263,7 +262,7 @@ function build() {
     var rows = data.byStage.map(function (g) {
       return {
         label: g.key, value: g[m], valueText: valText(g, m), cls: STAGE_CLS[g.key],
-        name: g.key + " (" + plural(g.n, "deal") + ")", tipRows: measureRows(g, st),
+        name: g.key + " (" + plural(g.n, "deal") + ")", tipRows: measureRows(g),
         aria: g.key + ", " + C.MEASURES[m] + " " + C.compact(g[m]) + ", " + plural(g.n, "deal")
       };
     });
@@ -272,8 +271,8 @@ function build() {
     stage.sub.textContent = C.MEASURES[m] + " on " + plural(data.kpi.open.n, "open deal") + ". Darker bars are later in the sales process. Blocked is gray." +
       (unsized ? " " + plural(unsized, "deal") + " without a size " + (unsized === 1 ? "is" : "are") + " not counted." : "");
     stage.specs = [{
-      caption: "Open pipeline by stage", head: ["Stage", "Deals", "Deal size", "Est. margin", "Weighted margin"],
-      rows: data.byStage.map(function (g) { return [g.key, String(g.n), C.full(g.size), C.full(g.margin), C.full(g.weighted)]; })
+      caption: "Open pipeline by stage", head: ["Stage", "Deals", "Deal size", "Est. margin"],
+      rows: data.byStage.map(function (g) { return [g.key, String(g.n), C.full(g.size), C.full(g.margin)]; })
     }];
   };
 
@@ -283,7 +282,7 @@ function build() {
     var rows = ranked.map(function (g) {
       return {
         label: g.label, value: g[m], valueText: valText(g, m),
-        cls: g.key === "" || g.folded ? "cg" : "c1", name: g.label + " (" + plural(g.n, "deal") + ")", tipRows: measureRows(g, st),
+        cls: g.key === "" || g.folded ? "cg" : "c1", name: g.label + " (" + plural(g.n, "deal") + ")", tipRows: measureRows(g),
         aria: g.label + ", " + C.MEASURES[m] + " " + C.compact(g[m]) + ", " + plural(g.n, "deal")
       };
     });
@@ -292,8 +291,8 @@ function build() {
     var un = data.bySeller.filter(function (g) { return g.key === "" && g.n; })[0];
     seller.sub.textContent = C.MEASURES[m] + " by seller, open pipeline." + (un ? " " + plural(un.n, "deal") + " with no seller " + (un.n === 1 ? "is" : "are") + " shown in gray." : "");
     seller.specs = [{
-      caption: "Open pipeline by seller", head: ["Seller", "Deals", "Deal size", "Est. margin", "Weighted margin"],
-      rows: ranked.map(function (g) { return [g.label, String(g.n), C.full(g.size), C.full(g.margin), C.full(g.weighted)]; })
+      caption: "Open pipeline by seller", head: ["Seller", "Deals", "Deal size", "Est. margin"],
+      rows: ranked.map(function (g) { return [g.label, String(g.n), C.full(g.size), C.full(g.margin)]; })
     }];
   };
 
@@ -304,7 +303,7 @@ function build() {
       var nm = (g.title || g.label) + " (" + plural(g.n, "deal") + ")";
       return {
         label: g.label, short: g.kind === "overdue" ? "Past" : g.kind === "later" ? "12m+" : g.kind === "none" ? "None" : g.label.replace(/ '\d\d$/, ""),
-        value: g[m], valueText: C.compact(g[m]), cls: cls, name: nm, tipRows: measureRows(g, st),
+        value: g[m], valueText: C.compact(g[m]), cls: cls, name: nm, tipRows: measureRows(g),
         aria: nm + ", " + C.MEASURES[m] + " " + C.compact(g[m])
       };
     });
@@ -316,8 +315,8 @@ function build() {
     timeline.sub.textContent = C.MEASURES[m] + " of open deals by expected close month." +
       (over.n ? " " + plural(over.n, "deal") + " past the close date." : "") + (none.n ? " " + plural(none.n, "deal") + " with no date." : "");
     timeline.specs = [{
-      caption: "Open pipeline by expected close", head: ["Close", "Deals", "Deal size", "Est. margin", "Weighted margin"],
-      rows: data.timeline.map(function (g) { return [g.title || g.label, String(g.n), C.full(g.size), C.full(g.margin), C.full(g.weighted)]; })
+      caption: "Open pipeline by expected close", head: ["Close", "Deals", "Deal size", "Est. margin"],
+      rows: data.timeline.map(function (g) { return [g.title || g.label, String(g.n), C.full(g.size), C.full(g.margin)]; })
     }];
   };
 
@@ -332,7 +331,7 @@ function build() {
       var segs = data.byLead.map(function (g) {
         return {
           value: g[m], cls: cls[g.key], inkVar: inkVar[g.key], valueText: C.compact(g[m]),
-          name: names[g.key] + " (" + plural(g.n, "deal") + ")", tipRows: measureRows(g, st),
+          name: names[g.key] + " (" + plural(g.n, "deal") + ")", tipRows: measureRows(g),
           aria: names[g.key] + ", " + C.compact(g[m]) + ", " + pct(g[m] / total)
         };
       });
@@ -347,17 +346,17 @@ function build() {
     var rows = data.byTw.map(function (g) {
       return {
         label: g.key, value: g[m], valueText: valText(g, m), cls: TW_ORD_CLS[g.key],
-        name: g.key + " (" + plural(g.n, "deal") + ")", tipRows: measureRows(g, st),
+        name: g.key + " (" + plural(g.n, "deal") + ")", tipRows: measureRows(g),
         aria: g.key + ", " + C.MEASURES[m] + " " + C.compact(g[m]) + ", " + plural(g.n, "deal")
       };
     });
     hBars(lead.body, rows, { aria: C.MEASURES[m] + " by Thoughtworks engagement", maxLabel: 120 });
     lead.sub.textContent = C.MEASURES[m] + ", open pipeline. Darker engagement bars mean closer Thoughtworks involvement.";
     lead.specs = [
-      { caption: "Open pipeline by lead", head: ["Lead", "Deals", "Deal size", "Est. margin", "Weighted margin"],
-        rows: data.byLead.map(function (g) { return [names[g.key], String(g.n), C.full(g.size), C.full(g.margin), C.full(g.weighted)]; }) },
-      { caption: "Open pipeline by Thoughtworks engagement", head: ["Engagement", "Deals", "Deal size", "Est. margin", "Weighted margin"],
-        rows: data.byTw.map(function (g) { return [g.key, String(g.n), C.full(g.size), C.full(g.margin), C.full(g.weighted)]; }) }
+      { caption: "Open pipeline by lead", head: ["Lead", "Deals", "Deal size", "Est. margin"],
+        rows: data.byLead.map(function (g) { return [names[g.key], String(g.n), C.full(g.size), C.full(g.margin)]; }) },
+      { caption: "Open pipeline by Thoughtworks engagement", head: ["Engagement", "Deals", "Deal size", "Est. margin"],
+        rows: data.byTw.map(function (g) { return [g.key, String(g.n), C.full(g.size), C.full(g.margin)]; }) }
     ];
   };
 
@@ -368,7 +367,7 @@ function build() {
       var sub = d.stage + (d.seller ? " · " + d.seller : "");
       return {
         label: d.account, sub: sub, value: d[m], valueText: C.compact(d[m]), cls: "c1", name: d.account + ", " + sub,
-        tipRows: [{ k: "Deal size", v: C.full(d.size) }, { k: "Estimated margin", v: C.full(d.margin) }, { k: "Weighted margin", v: C.full(d.weighted) }],
+        tipRows: [{ k: "Deal size", v: C.full(d.size) }, { k: "Estimated margin", v: C.full(d.margin) }],
         aria: d.account + ", " + d.stage + ", " + C.MEASURES[m] + " " + C.compact(d[m])
       };
     });
@@ -377,8 +376,8 @@ function build() {
     var skipped = data.kpi.open.unsized;
     deals.sub.textContent = "Top " + rows.length + " by " + C.MEASURES[m].toLowerCase() + "." + (skipped ? " " + plural(skipped, "deal") + " without a size cannot be ranked." : "");
     deals.specs = [{
-      caption: "Largest open deals", head: ["Account", "Stage", "Seller", "Deal size", "Est. margin", "Weighted margin"],
-      rows: top.map(function (d) { return [d.account, d.stage, d.seller || "Unassigned", C.full(d.size), C.full(d.margin), C.full(d.weighted)]; })
+      caption: "Largest open deals", head: ["Account", "Stage", "Seller", "Deal size", "Est. margin"],
+      rows: top.map(function (d) { return [d.account, d.stage, d.seller || "Unassigned", C.full(d.size), C.full(d.margin)]; })
     }];
   };
 
@@ -434,8 +433,7 @@ function renderKpis(data) {
   }
   var blended = k.blendedGm == null ? "" : "Blended GM " + pct(k.blendedGm);
   add(box, [
-    tile("Weighted margin", C.compact(k.open.weighted), "Open pipeline, by stage win probability", true),
-    tile("Estimated margin", C.compact(k.open.margin), blended || "Add deal sizes to see this"),
+    tile("Estimated margin", C.compact(k.open.margin), blended || "Add deal sizes to see this", true),
     tile("Open deal size", C.compact(k.open.size), plural(k.open.n, "open deal") + (k.open.unsized ? ", " + k.open.unsized + " without a size" : "")),
     tile("Closed won", C.compact(k.won.margin), plural(k.won.n, "deal") + ", " + C.compact(k.won.size) + " deal size"),
     tile("Rows with gaps", data.gaps.anyGap + " of " + data.gaps.open, "Missing a size, seller or next step")
@@ -497,7 +495,7 @@ function init() {
   });
   $("dMeasure").addEventListener("keydown", function (e) {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-    var keys = ["margin", "weighted", "size"], i = keys.indexOf(D.measure);
+    var keys = ["margin", "size"], i = keys.indexOf(D.measure);
     i = (i + (e.key === "ArrowRight" ? 1 : keys.length - 1)) % keys.length;
     D.measure = keys[i]; rerender();
     var b = document.querySelector('#dMeasure [data-m="' + D.measure + '"]'); if (b) b.focus();

@@ -7,7 +7,7 @@ var STAGES = ["Identified", "Discovery", "Qualified", "Proposal / RFP", "Blocked
 var OPEN = ["Identified", "Discovery", "Qualified", "Proposal / RFP", "Blocked"];
 var TW_ORDER = ["Engaged", "Strong fit", "Target", "Potential", "Not indicated", "Zones only"];
 var MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-var MEASURES = { margin: "Estimated margin", weighted: "Weighted margin", size: "Deal size" };
+var MEASURES = { margin: "Estimated margin", size: "Deal size" };
 
 /* ---------- per row math (the single source of truth for the page) ---------- */
 function isOpen(o) { return OPEN.indexOf(o.stage) > -1; }
@@ -20,8 +20,6 @@ function marginOf(o, st) {
   var g = gmOf(o, st) / 100;
   return st.marginBasis === "cost" ? o.size / (1 - g) - o.size : o.size * g;
 }
-function probOf(o, st) { var p = st.probs[o.stage]; return (p == null ? 0 : p) / 100; }
-function weightedOf(o, st) { var m = marginOf(o, st); return m == null ? null : m * probOf(o, st); }
 function gapsOf(o) {
   if (!isOpen(o)) return [];
   var g = [];
@@ -32,7 +30,7 @@ function gapsOf(o) {
 }
 
 /* ---------- aggregation ---------- */
-function blank() { return { n: 0, sized: 0, size: 0, margin: 0, weighted: 0, unsized: 0 }; }
+function blank() { return { n: 0, sized: 0, size: 0, margin: 0, unsized: 0 }; }
 function add(acc, o, st) {
   acc.n++;
   var m = marginOf(o, st);
@@ -40,7 +38,6 @@ function add(acc, o, st) {
   acc.sized++;
   acc.size += o.size;
   acc.margin += m;
-  acc.weighted += m * probOf(o, st);
 }
 function isoDay(d) {
   var m = d.getMonth() + 1, day = d.getDate();
@@ -154,7 +151,7 @@ function rankSellers(groups, measure, limit) {
     var other = blank(); other.key = "\u0000other"; other.label = "Other (" + tail.length + ")"; other.folded = tail.length;
     tail.forEach(function (g) {
       other.n += g.n; other.sized += g.sized; other.size += g.size; other.margin += g.margin;
-      other.weighted += g.weighted; other.unsized += g.unsized;
+      other.unsized += g.unsized;
     });
     out.push(other);
   }
@@ -168,7 +165,7 @@ function topDeals(openDeals, st, measure, limit) {
   var rows = openDeals.filter(function (o) { return o.size != null; }).map(function (o) {
     return {
       id: o.id, account: o.account, stage: o.stage, seller: o.seller || "",
-      size: o.size, margin: marginOf(o, st), weighted: weightedOf(o, st)
+      size: o.size, margin: marginOf(o, st)
     };
   });
   rows.sort(function (a, b) { return b[measure] - a[measure] || a.account.localeCompare(b.account); });
@@ -187,7 +184,7 @@ function full(n) { return n == null ? "" : "$" + Math.round(n).toLocaleString("e
 
 root.DashCalc = {
   STAGES: STAGES, OPEN: OPEN, TW_ORDER: TW_ORDER, MEASURES: MEASURES,
-  isOpen: isOpen, gmOf: gmOf, marginOf: marginOf, probOf: probOf, weightedOf: weightedOf, gapsOf: gapsOf,
+  isOpen: isOpen, gmOf: gmOf, marginOf: marginOf, gapsOf: gapsOf,
   build: build, rankSellers: rankSellers, topDeals: topDeals, compact: compact, full: full, isoDay: isoDay
 };
 })(typeof window !== "undefined" ? window : globalThis);

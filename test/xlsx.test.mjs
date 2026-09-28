@@ -10,7 +10,7 @@ import { DEFAULT_SETTINGS, OPP_FIELDS } from "../src/lib/validate.js";
 import { SAMPLE_OPPS } from "../src/lib/sample-data.js";
 import { applyPlan, buildWorkbook, describePlan, parseWorkbook, planImport, XLSX_TYPE } from "../src/lib/xlsx.js";
 
-const settings = { ...DEFAULT_SETTINGS, probs: { ...DEFAULT_SETTINGS.probs } };
+const settings = { ...DEFAULT_SETTINGS };
 const NOW = new Date().toISOString();
 
 async function seeded(items = SAMPLE_OPPS) {
@@ -37,7 +37,9 @@ test("export: header, one row per opportunity, formulas with cached results, ass
   const as = wb.getWorksheet("Assumptions");
   assert.equal(as.getCell("B2").value, "price");
   assert.equal(as.getCell("B3").value, 30);
-  assert.equal(as.getCell("A6").value, "Identified");
+  assert.equal(as.getCell("A5").value, "Open pipeline (everything except Won and Lost)");
+  assert.equal(as.getCell("A6").value, "Deal size");
+  assert.equal(as.getCell("A7").value, "Est. margin");
 });
 
 test("round trip: export then import into an empty tracker recreates every field and id", async () => {
@@ -71,7 +73,7 @@ test("editing cells in Excel updates only the changed fields, and blank clears o
   const wb = await load(await buildWorkbook({ opps: before, settings }));
   const ws = wb.getWorksheet("Pipeline");
   const row = ws.getRow(2);
-  const id = row.getCell(16).value;
+  const id = row.getCell(15).value; // 15 columns now that "Weighted margin (formula)" is gone
   row.getCell(3).value = "Won";      // stage
   row.getCell(8).value = 123456;     // deal size
   row.getCell(6).value = null;       // seller cleared

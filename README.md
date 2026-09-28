@@ -1,6 +1,6 @@
 # AI Practice Pipeline
 
-A shared tracker for the Zones and Thoughtworks AI practice pipeline. Opportunities, stages, deal size, estimated and weighted margin, data gap flags, and a plain warning when one deal dominates the total. It replaces the Excel tracker and the Power BI attempt with something people edit directly.
+A shared tracker for the Zones and Thoughtworks AI practice pipeline. Opportunities, stages, deal size, estimated margin, data gap flags, and a plain warning when one deal dominates the total. It replaces the Excel tracker and the Power BI attempt with something people edit directly.
 
 **Status: beta. No sign in yet. Fictional sample data only.**
 
@@ -70,7 +70,7 @@ The Cosmos data role for you personally is assigned during deploy and can take a
 
 The Theme menu (top right) has System, Light, Dark, Warm low glare and High contrast. The choice is saved in the browser only. Every theme uses the same colourblind safe chart palette (blue and orange, checked for the common colour vision types). High contrast adds hatch texture to two colour charts, and printing forces the light theme with texture on and hides the controls.
 
-The Dashboard tab sits next to Pipeline (`#dashboard` in the URL is linkable). One row of controls scopes every chart: the measure (estimated margin, weighted margin or deal size), lead, and segment. Charts cover margin by stage and by seller, the expected close timeline, Zones versus Thoughtworks, the largest open deals, and data quality. Every chart has a Table view button that swaps the graphic for the same numbers as a table.
+The Dashboard tab sits next to Pipeline (`#dashboard` in the URL is linkable). One row of controls scopes every chart: the measure (estimated margin or deal size), lead, and segment. Charts cover margin by stage and by seller, the expected close timeline, Zones versus Thoughtworks, the largest open deals, and data quality. Every chart has a Table view button that swaps the graphic for the same numbers as a table.
 
 Read the numbers with two caveats. Open deals with no size are counted in deal counts but cannot add to any dollar figure, and the cards say how many were left out. There is also no trend over time, because the app stores the current state only. Trends need weekly snapshots, which is a separate piece of work.
 
@@ -126,7 +126,7 @@ This needs nothing new in Azure: no email service, no secrets, no new role assig
 
 The page has Export and Import buttons. Both are turned off until a user is signed in, because each moves the whole data set in one request and the beta has no sign in. They work locally (`npm run dev`) because the dev server has fictional data only.
 
-**Export** downloads `ai-pipeline-YYYY-MM-DD.xlsx` with two sheets. `Pipeline` has one row per opportunity, dropdowns on Stage, Lead and Thoughtworks, and live formulas for Est. margin and Weighted margin. `Assumptions` holds the margin basis, default GM and stage probabilities those formulas read, plus open pipeline totals. Changing Assumptions in Excel changes that workbook only. The app does not read them back.
+**Export** downloads `ai-pipeline-YYYY-MM-DD.xlsx` with two sheets. `Pipeline` has one row per opportunity, dropdowns on Stage, Lead and Thoughtworks, and a live formula for Est. margin. `Assumptions` holds the margin basis and default GM those formulas read, plus open pipeline totals. Changing Assumptions in Excel changes that workbook only. The app does not read them back.
 
 **Import** takes an .xlsx and shows a preview (new, updated, unchanged, skipped, with a reason for every skipped row) before anything is saved. It never deletes a row. It reads two layouts:
 
@@ -146,7 +146,7 @@ Once sign in is on, no setting is needed. Anyone who is signed in can import and
 
 ## Margin, so nobody is surprised
 
-Estimated margin = deal size × GM%, where GM% is a default (30%) with an optional override per row. The Assumptions panel can switch to a cost basis (size ÷ (1 − GM) − size) if deal size is really your cost. The old workbook mixed both, which is why its total was inflated. Weighted margin multiplies by a per stage win probability. The starting probabilities are guesses. Replace them with your real close rates.
+Estimated margin = deal size × GM%, where GM% is a default (30%) with an optional override per row. The Assumptions panel can switch to a cost basis (size ÷ (1 − GM) − size) if deal size is really your cost. The old workbook mixed both, which is why its total was inflated. This tracker does not forecast or weight margin by win probability. That is a sales function, not something this tool computes.
 
 Resale heavy deals (hardware, licences) do not carry consulting margins. Set a real GM% on those rows, or the total is fiction. The page warns when one deal is over a third of the margin.
 

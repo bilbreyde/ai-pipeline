@@ -5,10 +5,10 @@ var OPEN=["Identified","Discovery","Qualified","Proposal / RFP","Blocked"];
 var SEGMENTS=["ITS","ENT","MM","Healthcare","SLED / Public Sector Utility"];
 var LEADS=["Zones","Thoughtworks"];
 var TW=["Engaged","Strong fit","Target","Potential","Not indicated","Zones only"];
-var DEFAULTS={marginBasis:"price",defaultGm:30,probs:{"Identified":5,"Discovery":10,"Qualified":25,"Proposal / RFP":50,"Blocked":10,"Won":100,"Lost":0}};
+var DEFAULTS={marginBasis:"price",defaultGm:30};
 var COLS=[
   {k:"account",l:"Account"},{k:"stage",l:"Stage"},{k:"seller",l:"Seller / lead"},
-  {k:"size",l:"Deal size",num:1},{k:"margin",l:"Est. margin",num:1},{k:"weighted",l:"Weighted",num:1},
+  {k:"size",l:"Deal size",num:1},{k:"margin",l:"Est. margin",num:1},
   {k:"next",l:"Next step",ns:1},{k:"close",l:"Close"},{k:"updated",l:"Updated"}
 ];
 var S={canWrite:true,me:"",bulk:false,ai:false,aiWhy:"",aiDemo:false,tab:"pipeline",loaded:false,offline:false,err:"",opps:[],settings:clone(DEFAULTS),
@@ -35,8 +35,6 @@ function parseMoney(s){
 }
 function gmOf(o){return DC.gmOf(o,S.settings)}
 function marginOf(o){return DC.marginOf(o,S.settings)}
-function probOf(o){return DC.probOf(o,S.settings)}
-function weightedOf(o){return DC.weightedOf(o,S.settings)}
 function gapsOf(o){return DC.gapsOf(o)}
 function todayStart(){var d=new Date();d.setHours(0,0,0,0);return d}
 function parseDate(s){if(!s)return null;var d=new Date(s+"T00:00:00");return isNaN(d)?null:d}
@@ -98,10 +96,8 @@ function delOpp(id){
 }
 var settingsT,settingsDirty=false;
 function saveSettings(){
-  var probs={};
-  STAGES.forEach(function(s,i){var v=parseFloat($("p-"+i).value);probs[s]=isFinite(v)?Math.min(100,Math.max(0,v)):0});
   var gm=parseFloat($("defGm").value);
-  var next={marginBasis:$("basisCost").checked?"cost":"price",defaultGm:isFinite(gm)?Math.min(90,Math.max(1,gm)):30,probs:probs};
+  var next={marginBasis:$("basisCost").checked?"cost":"price",defaultGm:isFinite(gm)?Math.min(90,Math.max(1,gm)):30};
   S.settings=next;settingsDirty=true;render(true);
   clearTimeout(settingsT);
   settingsT=setTimeout(function(){
@@ -130,7 +126,6 @@ function filtered(){
       case "seller":return (o.seller||"").toLowerCase();
       case "size":return o.size==null?null:o.size;
       case "margin":return marginOf(o);
-      case "weighted":return weightedOf(o);
       case "next":return (o.nextStep||"").toLowerCase();
       case "close":return o.closeDate||null;
       case "updated":return o.updatedAt||null;
@@ -149,8 +144,8 @@ function filtered(){
 /* ---------- render ---------- */
 function renderBand(){
   var open=S.opps.filter(isOpen),sized=open.filter(function(o){return o.size!=null});
-  var size=0,mar=0,wt=0;
-  sized.forEach(function(o){size+=o.size;mar+=marginOf(o)||0;wt+=weightedOf(o)||0});
+  var size=0,mar=0;
+  sized.forEach(function(o){size+=o.size;mar+=marginOf(o)||0});
   var noSeller=open.filter(function(o){return !o.seller}).length;
   var unsized=open.length-sized.length;
   var gapRows=open.filter(function(o){return gapsOf(o).length}).length;
@@ -158,7 +153,6 @@ function renderBand(){
   $("band").innerHTML=
     '<div class="metric"><span class="m-label">Open deal size</span><span class="m-val">'+compact(size)+'</span><span class="m-note">'+open.length+' open opportunities</span></div>'+
     '<div class="metric"><span class="m-label">Est. margin</span><span class="m-val">'+compact(mar)+'</span><span class="m-note">at '+S.settings.defaultGm+'% GM default, '+basisTxt+'</span></div>'+
-    '<div class="metric"><span class="m-label">Weighted margin</span><span class="m-val">'+compact(wt)+'</span><span class="m-note">by stage win probability</span></div>'+
     '<div class="metric'+(gapRows?' flag':'')+'"><span class="m-label">Rows with gaps</span><span class="m-val">'+gapRows+' of '+open.length+'</span><span class="m-note"><b>'+unsized+'</b> without a size, <b>'+noSeller+'</b> without a seller</span></div>';
 }
 function renderInsights(){
@@ -205,14 +199,14 @@ function renderHead(){
 function renderTable(){
   var rows=filtered(),tb=$("tbody"),today=todayStart();
   if(!S.loaded){
-    tb.innerHTML='<tr><td colspan="9"><div class="empty">'+(S.offline?"Can't reach the pipeline service yet.":"Loading pipeline")+'</div></td></tr>';
+    tb.innerHTML='<tr><td colspan="8"><div class="empty">'+(S.offline?"Can't reach the pipeline service yet.":"Loading pipeline")+'</div></td></tr>';
     $("tfoot").innerHTML="";$("count").textContent="";return;
   }
   if(!rows.length){
-    tb.innerHTML='<tr><td colspan="9"><div class="empty">'+(S.opps.length?"No opportunities match these filters.":"No opportunities yet. Use Add opportunity, or Import to load a spreadsheet.")+'</div></td></tr>';
+    tb.innerHTML='<tr><td colspan="8"><div class="empty">'+(S.opps.length?"No opportunities match these filters.":"No opportunities yet. Use Add opportunity, or Import to load a spreadsheet.")+'</div></td></tr>';
   }else{
     tb.innerHTML=rows.map(function(o){
-      var m=marginOf(o),w=weightedOf(o),gaps=gapsOf(o);
+      var m=marginOf(o),gaps=gapsOf(o);
       var tags=gaps.map(function(g){return '<span class="tag">'+g+'</span>'}).join("");
       if(o.tw==="Engaged"||o.tw==="Strong fit"||o.tw==="Target")tags+='<span class="tag tw">TW '+esc(o.tw.toLowerCase())+'</span>';
       if(o.activityCount)tags+='<span class="tag mtg" title="Meeting history, last on '+esc(new Date(o.lastActivityAt).toLocaleDateString("en-US",{month:"short",day:"numeric"}))+'">'+o.activityCount+(o.activityCount===1?" meeting":" meetings")+'</span>';
@@ -229,15 +223,14 @@ function renderTable(){
         '<td class="who"><b>'+(o.seller?esc(o.seller):'<span style="color:var(--ink-3);font-weight:400">Unassigned</span>')+'</b><span>'+esc([o.lead?o.lead+" lead":"",o.segment||""].filter(Boolean).join(" · "))+'</span></td>'+
         '<td class="num">'+(o.size==null?'<span class="na">–</span>':full(o.size))+'</td>'+
         '<td class="num">'+(m==null?'<span class="na">–</span>':full(m))+'</td>'+
-        '<td class="num">'+(w==null?'<span class="na">–</span>':full(w))+'</td>'+
         '<td class="next"><div title="'+esc(o.nextStep||"")+'">'+esc(o.nextStep||"")+'</div></td>'+
         '<td class="date'+(late?" late":"")+'">'+(cd?fmtDate(cd)+(late?" (overdue)":""):'<span class="na">–</span>')+'</td>'+
         '<td class="upd'+(stale?" stale":"")+'">'+updTxt+'</td></tr>';
     }).join("");
   }
-  var ts=0,tm=0,tw=0,n=0;
-  rows.forEach(function(o){var m=marginOf(o);if(o.size!=null&&isOpen(o)){ts+=o.size}if(m!=null&&isOpen(o)){tm+=m;tw+=weightedOf(o)}if(isOpen(o))n++});
-  $("tfoot").innerHTML=rows.length?'<tr><td class="lbl" colspan="3">Total, open opportunities shown ('+n+')</td><td class="num">'+full(ts)+'</td><td class="num">'+full(tm)+'</td><td class="num">'+full(tw)+'</td><td colspan="3"></td></tr>':"";
+  var ts=0,tm=0,n=0;
+  rows.forEach(function(o){var m=marginOf(o);if(o.size!=null&&isOpen(o)){ts+=o.size}if(m!=null&&isOpen(o)){tm+=m}if(isOpen(o))n++});
+  $("tfoot").innerHTML=rows.length?'<tr><td class="lbl" colspan="3">Total, open opportunities shown ('+n+')</td><td class="num">'+full(ts)+'</td><td class="num">'+full(tm)+'</td><td colspan="3"></td></tr>':"";
   $("count").textContent="Showing "+rows.length+" of "+S.opps.length;
   var sel=$("sellers"),set={};S.opps.forEach(function(o){if(o.seller)set[o.seller]=1});
   for(var sn in S.sellers){if(Object.prototype.hasOwnProperty.call(S.sellers,sn))set[sn]=1}
@@ -248,7 +241,6 @@ function syncAssumptions(){
   function put(id,v){var el=$(id);if(el!==a)el.value=v}
   $("basisPrice").checked=st.marginBasis!=="cost";$("basisCost").checked=st.marginBasis==="cost";
   put("defGm",st.defaultGm);
-  STAGES.forEach(function(s){put("p-"+STAGES.indexOf(s),st.probs[s]==null?0:st.probs[s])});
   $("assumpSum").textContent=(st.marginBasis==="cost"?"Cost basis":"Sell price basis")+", "+st.defaultGm+"% default GM";
 }
 function renderDash(){
@@ -309,9 +301,9 @@ function updatePreview(){
   var d=readForm(),bad=isNaN(d.size);
   if(bad){$("preview").textContent="Deal size needs to be a number, like 250000 or 250k.";return}
   d.size=d.size==null?null:d.size;
-  var m=marginOf(d),w=m==null?null:m*probOf(d);
+  var m=marginOf(d);
   $("preview").innerHTML=m==null?"Add a deal size to see margin.":
-    'Est. margin <b>'+full(m)+'</b> at '+gmOf(d)+'% GM. Weighted <b>'+full(w)+'</b> at '+Math.round(probOf(d)*100)+'% for '+esc(d.stage)+'.';
+    'Est. margin <b>'+full(m)+'</b> at '+gmOf(d)+'% GM.';
 }
 function setDelLabel(){$("ddel").textContent=S.delArmed?"Confirm delete":"Delete"}
 function openDrawer(id){
@@ -546,7 +538,6 @@ function bind(){
   $("fStage").innerHTML='<option value="all">All stages</option><option value="open">Open only</option>'+STAGES.map(function(s){return '<option>'+esc(s)+'</option>'}).join("");
   $("fLead").innerHTML='<option value="">Any lead</option>'+LEADS.map(function(s){return '<option>'+s+'</option>'}).join("")+'<option value="_none">No lead set</option>';
   $("fSeg").innerHTML='<option value="">Any segment</option>'+SEGMENTS.map(function(s){return '<option>'+esc(s)+'</option>'}).join("");
-  $("probs").innerHTML=STAGES.map(function(s,i){return '<label>'+esc(s)+' %<input type="number" min="0" max="100" step="5" id="p-'+i+'"></label>'}).join("");
 
   $("q").addEventListener("input",function(e){S.f.q=e.target.value;renderTable()});
   $("fStage").addEventListener("change",function(e){S.f.stage=e.target.value;renderTable()});
@@ -601,7 +592,6 @@ function bind(){
     if(!$("smodal").hidden)closeSellerPrompt();else if(!$("imodal").hidden)closeImport();else if(!$("drawer").hidden)closeDrawer();
   });
   ["basisPrice","basisCost","defGm"].forEach(function(i){$(i).addEventListener("input",saveSettings);$(i).addEventListener("change",saveSettings)});
-  $("probs").addEventListener("input",saveSettings);
 }
 
 function mergeSettings(d){
@@ -609,7 +599,6 @@ function mergeSettings(d){
   if(d){
     if(d.marginBasis==="cost"||d.marginBasis==="price")s.marginBasis=d.marginBasis;
     if(typeof d.defaultGm==="number")s.defaultGm=d.defaultGm;
-    if(d.probs)STAGES.forEach(function(st){if(typeof d.probs[st]==="number")s.probs[st]=d.probs[st]});
   }
   return s;
 }

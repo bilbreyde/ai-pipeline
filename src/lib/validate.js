@@ -8,15 +8,6 @@ export const ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
 export const DEFAULT_SETTINGS = Object.freeze({
   marginBasis: "price",
   defaultGm: 30,
-  probs: Object.freeze({
-    "Identified": 5,
-    "Discovery": 10,
-    "Qualified": 25,
-    "Proposal / RFP": 50,
-    "Blocked": 10,
-    "Won": 100,
-    "Lost": 0,
-  }),
 });
 
 // [min, max] length after trimming. min 0 means optional.
@@ -137,29 +128,26 @@ export function validateSeller(input) {
   return { value: { name, email: email.toLowerCase() }, errors: [] };
 }
 
-/** Validate a settings payload. Returns { value, errors }. */
+/**
+ * Validate a settings payload. Returns { value, errors }.
+ * "probs" (win probability by stage) is a removed field: it only ever fed weighted margin, which this
+ * tracker no longer computes (pipeline forecasting is a sales function, not something this tool does).
+ * A settings document saved before that removal may still carry it, so it is dropped silently here rather
+ * than rejected as an unknown field, which would otherwise invalidate the whole saved object and reset
+ * marginBasis and defaultGm back to their defaults.
+ */
 export function validateSettings(input) {
   if (input === null || typeof input !== "object" || Array.isArray(input)) {
     return { errors: ["Body must be a JSON object."] };
   }
   const errors = [];
   for (const k of Object.keys(input)) {
-    if (!["marginBasis", "defaultGm", "probs"].includes(k)) errors.push(`Unknown field: ${k}.`);
+    if (k === "probs") continue;
+    if (!["marginBasis", "defaultGm"].includes(k)) errors.push(`Unknown field: ${k}.`);
   }
   if (input.marginBasis !== "price" && input.marginBasis !== "cost") errors.push("marginBasis must be price or cost.");
   const g = input.defaultGm;
   if (typeof g !== "number" || !Number.isFinite(g) || g < 1 || g > 90) errors.push("defaultGm must be a number from 1 to 90.");
-  const probs = {};
-  if (input.probs === null || typeof input.probs !== "object" || Array.isArray(input.probs)) {
-    errors.push("probs must be an object keyed by stage.");
-  } else {
-    for (const k of Object.keys(input.probs)) if (!STAGES.includes(k)) errors.push(`Unknown stage in probs: ${k}.`);
-    for (const s of STAGES) {
-      const p = input.probs[s];
-      if (typeof p !== "number" || !Number.isFinite(p) || p < 0 || p > 100) errors.push(`probs["${s}"] must be a number from 0 to 100.`);
-      else probs[s] = p;
-    }
-  }
   if (errors.length) return { errors };
-  return { value: { marginBasis: input.marginBasis, defaultGm: g, probs }, errors: [] };
+  return { value: { marginBasis: input.marginBasis, defaultGm: g }, errors: [] };
 }

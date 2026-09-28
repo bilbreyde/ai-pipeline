@@ -53,11 +53,6 @@
         <div class="inline-num"><label for="defGm">Default GM%</label><input type="number" id="defGm" min="1" max="90" step="1"></div>
         <p class="hint">A row can override the default with its own GM%. Set one on any resale heavy deal.</p>
       </div>
-      <div>
-        <h3>Win probability by stage</h3>
-        <div class="probs" id="probs"></div>
-        <p class="hint">Used only for the weighted margin. These are starting guesses, so replace them with your own close rates.</p>
-      </div>
     </div>
   </details>
 
@@ -86,7 +81,6 @@
     <div class="fgroup"><span class="flabel" id="dMeasureL">Measure</span>
       <div class="seg" id="dMeasure" role="radiogroup" aria-labelledby="dMeasureL">
         <button type="button" role="radio" data-m="margin" aria-checked="true">Estimated margin</button>
-        <button type="button" role="radio" data-m="weighted" aria-checked="false" tabindex="-1">Weighted margin</button>
         <button type="button" role="radio" data-m="size" aria-checked="false" tabindex="-1">Deal size</button>
       </div>
     </div>

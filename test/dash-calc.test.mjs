@@ -11,7 +11,7 @@ const ctx = vm.createContext({});
 vm.runInContext(readFileSync(file, "utf8"), ctx);
 const C = ctx.DashCalc;
 
-const ST = { marginBasis: "price", defaultGm: 30, probs: { Identified: 5, Discovery: 10, Qualified: 25, "Proposal / RFP": 50, Blocked: 10, Won: 100, Lost: 0 } };
+const ST = { marginBasis: "price", defaultGm: 30 };
 const TODAY = "2026-09-21";
 const NOW = Date.parse("2026-09-21T12:00:00Z");
 const opp = (o) => ({ id: o.account, opportunity: "", stage: "Qualified", segment: "", lead: "", seller: "Sam", tw: "Not indicated", size: null, gmPct: null, closeDate: "", nextStep: "x", notes: "", updatedAt: "2026-09-20T00:00:00Z", ...o });
@@ -19,16 +19,14 @@ const opp = (o) => ({ id: o.account, opportunity: "", stage: "Qualified", segmen
 const plain = (x) => JSON.parse(JSON.stringify(x));
 const build = (opps, o = {}) => C.build(opps, ST, { today: TODAY, nowMs: NOW, ...o });
 
-test("row math: price basis, cost basis, GM override, probability", () => {
+test("row math: price basis, cost basis, GM override", () => {
   const o = opp({ account: "A", size: 100000, stage: "Proposal / RFP" });
   assert.equal(C.marginOf(o, ST), 30000);
-  assert.equal(C.weightedOf(o, ST), 15000);
   assert.equal(C.marginOf({ ...o, gmPct: 45 }, ST), 45000);
   const cost = { ...ST, marginBasis: "cost" };
   assert.ok(Math.abs(C.marginOf(o, cost) - (100000 / 0.7 - 100000)) < 1e-6);
   assert.equal(C.marginOf(opp({ account: "B" }), ST), null);
   assert.equal(C.marginOf({ ...o, size: NaN }, ST), null);
-  assert.equal(C.weightedOf(opp({ account: "B" }), ST), null);
 });
 
 test("totals separate open, won and lost, and count unsized deals without adding them", () => {
@@ -41,7 +39,6 @@ test("totals separate open, won and lost, and count unsized deals without adding
   assert.equal(d.kpi.open.n, 2);
   assert.equal(d.kpi.open.size, 100000);
   assert.equal(d.kpi.open.margin, 30000);
-  assert.equal(d.kpi.open.weighted, 7500);
   assert.equal(d.kpi.open.unsized, 1);
   assert.equal(d.kpi.won.margin, 60000);
   assert.equal(d.kpi.lost.n, 1);
@@ -104,8 +101,8 @@ test("sellers: ranked by the chosen measure, tail folded into Other, Unassigned 
   assert.equal(other.folded, 3);
   assert.equal(other.size, 1000 + 2000 + 3000);
   assert.equal(r.at(-1).label, "Unassigned");
-  const byWeighted = C.rankSellers(d.bySeller, "weighted", 2);
-  assert.equal(byWeighted.length, 4);
+  const byMargin = C.rankSellers(d.bySeller, "margin", 2);
+  assert.equal(byMargin.length, 4); // 2 + Other + Unassigned, same folding logic under a different measure
 });
 
 test("largest deals skip unsized rows and follow the measure", () => {
@@ -117,7 +114,6 @@ test("largest deals skip unsized rows and follow the measure", () => {
   const d = build(list);
   assert.deepEqual(plain(C.topDeals(d.openDeals, ST, "size", 8).map((x) => x.account)), ["Big low margin", "Mid"]);
   assert.deepEqual(plain(C.topDeals(d.openDeals, ST, "margin", 8).map((x) => x.account)), ["Mid", "Big low margin"]);
-  assert.deepEqual(plain(C.topDeals(d.openDeals, ST, "weighted", 1).map((x) => x.account)), ["Mid"]);
 });
 
 test("data gaps count open rows only, and stale means no update in 14 days", () => {

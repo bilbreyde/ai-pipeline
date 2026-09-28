@@ -49,7 +49,6 @@ const COLUMNS = [
   { key: "nextStep", header: "Next step", width: 44, wrap: true },
   { key: "notes", header: "Notes", width: 44, wrap: true },
   { key: "margin", header: "Est. margin (formula)", width: 18, fmt: MONEY, computed: true },
-  { key: "weighted", header: "Weighted margin (formula)", width: 20, fmt: MONEY, computed: true },
   { key: "updated", header: "Last updated (ignored on import)", width: 30, computed: true },
   { key: "id", header: "Id (do not edit)", width: 38, computed: true },
 ];
@@ -95,7 +94,6 @@ export async function buildWorkbook({ opps, settings, now = new Date() }) {
   sorted.forEach((o, i) => {
     const r = i + 2;
     const m = marginFor(o, settings);
-    const p = (settings.probs[o.stage] ?? 0) / 100;
     const row = ws.addRow({
       account: o.account,
       opportunity: o.opportunity ?? "",
@@ -115,10 +113,6 @@ export async function buildWorkbook({ opps, settings, now = new Date() }) {
           `${L.size}${r}/(1-IF(${L.gmPct}${r}="",${A}$B$3,${L.gmPct}${r})/100)-${L.size}${r},` +
           `${L.size}${r}*IF(${L.gmPct}${r}="",${A}$B$3,${L.gmPct}${r})/100))`,
         result: m == null ? "" : m,
-      },
-      weighted: {
-        formula: `IF(${L.margin}${r}="","",${L.margin}${r}*IFERROR(VLOOKUP(${L.stage}${r},${A}$A$6:$B$12,2,FALSE),0)/100)`,
-        result: m == null ? "" : m * p,
       },
       updated: o.updatedAt ? `${o.updatedAt.slice(0, 10)}${o.updatedBy ? ` by ${o.updatedBy}` : ""}` : "",
       id: o.id,
@@ -164,18 +158,8 @@ export async function buildWorkbook({ opps, settings, now = new Date() }) {
   as.getCell("B3").value = settings.defaultGm;
   as.getCell("C3").value = "A row's GM% override replaces this default.";
   as.getCell("B2").dataValidation = { type: "list", allowBlank: false, formulae: ['"price,cost"'] };
-  for (const [i, h] of ["Stage", "Win probability %"].entries()) {
-    const cell = as.getCell(5, i + 1);
-    cell.value = h;
-    cell.font = { bold: true, color: { argb: WHITE } };
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
-  }
-  STAGES.forEach((s, i) => {
-    as.getCell(6 + i, 1).value = s;
-    as.getCell(6 + i, 2).value = settings.probs[s] ?? 0;
-  });
-  as.getCell("A14").value = "Open pipeline (everything except Won and Lost)";
-  as.getCell("A14").font = { bold: true, size: 13, color: { argb: NAVY } };
+  as.getCell("A5").value = "Open pipeline (everything except Won and Lost)";
+  as.getCell("A5").font = { bold: true, size: 13, color: { argb: NAVY } };
 
   const open = sorted.filter((o) => OPEN_STAGES.includes(o.stage));
   const sum = (f) => open.reduce((s, o) => s + (f(o) ?? 0), 0);
@@ -184,13 +168,9 @@ export async function buildWorkbook({ opps, settings, now = new Date() }) {
   const totals = [
     ["Deal size", "size", sum((o) => o.size)],
     ["Est. margin", "margin", sum((o) => marginFor(o, settings))],
-    ["Weighted margin", "weighted", sum((o) => {
-      const m = marginFor(o, settings);
-      return m == null ? null : m * ((settings.probs[o.stage] ?? 0) / 100);
-    })],
   ];
   totals.forEach(([label, key, result], i) => {
-    const r = 15 + i;
+    const r = 6 + i;
     as.getCell(r, 1).value = label;
     as.getCell(r, 2).value = {
       formula: `SUMIFS(${range(key)},${stageRange},"<>Won",${stageRange},"<>Lost")`,
@@ -198,10 +178,10 @@ export async function buildWorkbook({ opps, settings, now = new Date() }) {
     };
     as.getCell(r, 2).numFmt = MONEY;
   });
-  as.getCell("A19").value =
+  as.getCell("A9").value =
     "These mirror the app's Assumptions panel at export time. Editing them here changes this workbook's formulas only. Import does not read them back.";
-  as.getCell("A19").alignment = { wrapText: true, vertical: "top" };
-  as.mergeCells("A19:C20");
+  as.getCell("A9").alignment = { wrapText: true, vertical: "top" };
+  as.mergeCells("A9:C10");
 
   return Buffer.from(await wb.xlsx.writeBuffer());
 }

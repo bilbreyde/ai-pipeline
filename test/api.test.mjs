@@ -122,12 +122,21 @@ test("settings default, validate, and persist", async () => {
   const d = json(await call("GET", "/api/settings")).settings;
   assert.equal(d.marginBasis, "price");
   assert.equal(d.defaultGm, 30);
-  assert.equal((await call("PUT", "/api/settings", { marginBasis: "cost", defaultGm: 999, probs: {} })).status, 400);
-  const next = { marginBasis: "cost", defaultGm: 25, probs: { ...d.probs, Qualified: 40 } };
+  assert.equal((await call("PUT", "/api/settings", { marginBasis: "cost", defaultGm: 999 })).status, 400);
+  const next = { marginBasis: "cost", defaultGm: 25 };
   assert.equal((await call("PUT", "/api/settings", next)).status, 200);
   const back = json(await call("GET", "/api/settings")).settings;
   assert.equal(back.marginBasis, "cost");
-  assert.equal(back.probs.Qualified, 40);
+  assert.equal(back.defaultGm, 25);
+});
+
+test("a settings document saved before weighted margin was removed still loads: a stray probs field is dropped, not treated as invalid", async () => {
+  const { call, store } = await setup();
+  await store.putSettings({ marginBasis: "cost", defaultGm: 40, probs: { Identified: 5 } });
+  const d = json(await call("GET", "/api/settings")).settings;
+  assert.equal(d.marginBasis, "cost");
+  assert.equal(d.defaultGm, 40);
+  assert.equal(d.probs, undefined);
 });
 
 test("writes require a JSON content type and same origin", async () => {

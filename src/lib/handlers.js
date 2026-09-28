@@ -138,7 +138,7 @@ export function createHandlers({ store, webRoot, log = () => {}, info = () => {}
   async function currentSettings() {
     const saved = await store.getSettings();
     const { value } = saved ? validateSettings(saved) : {};
-    return value ?? { ...DEFAULT_SETTINGS, probs: { ...DEFAULT_SETTINGS.probs } };
+    return value ?? { ...DEFAULT_SETTINGS };
   }
 
   async function getSettings() {
