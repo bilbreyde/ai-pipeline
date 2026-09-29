@@ -115,7 +115,7 @@ function filtered(){
     if(f.lead&&(o.lead||"")!==(f.lead==="_none"?"":f.lead))return false;
     if(f.seg&&(o.segment||"")!==f.seg)return false;
     if(f.gaps&&!gapsOf(o).length)return false;
-    if(q){var hay=[o.account,o.opportunity,o.seller,o.nextStep,o.notes].join(" ").toLowerCase();if(hay.indexOf(q)<0)return false}
+    if(q){var hay=[o.account,o.opportunity,o.oppNumber,o.seller,o.nextStep,o.notes].join(" ").toLowerCase();if(hay.indexOf(q)<0)return false}
     return true;
   });
   var k=S.sort.k,dir=S.sort.d==="asc"?1:-1;
@@ -217,6 +217,7 @@ function renderTable(){
       var gmNote=o.gmPct!=null?' <span class="tag tw" title="GM% override">'+gmOf(o)+'% GM</span>':"";
       return '<tr class="'+(isOpen(o)?"":"closed")+'">'+
         '<td><button class="acct" type="button" data-open="'+esc(o.id)+'">'+esc(o.account)+'</button>'+
+          (o.oppNumber?'<span class="oppnum">'+esc(o.oppNumber)+'</span>':"")+
           (o.opportunity?'<div class="opp">'+esc(o.opportunity)+'</div>':"")+
           (tags||gmNote?'<div class="tags">'+tags+gmNote+'</div>':"")+'</td>'+
         '<td>'+stagePill(o)+'</td>'+
@@ -354,7 +355,7 @@ function fillSelect(el,opts,blank){
 function readForm(){
   var size=parseMoney($("f-size").value),gm=$("f-gm").value.trim();
   return {
-    account:$("f-account").value.trim(),opportunity:$("f-opp").value.trim(),stage:$("f-stage").value,
+    account:$("f-account").value.trim(),opportunity:$("f-opp").value.trim(),oppNumber:$("f-oppnum").value.trim(),stage:$("f-stage").value,
     segment:$("f-segment").value,lead:$("f-lead").value,seller:$("f-seller").value.trim(),tw:$("f-tw").value,
     closeDate:$("f-close").value,size:size,gmPct:gm===""?null:Number(gm),
     nextStep:$("f-next").value.trim(),notes:$("f-notes").value.trim()
@@ -374,7 +375,7 @@ function openDrawer(id){
   S.editing=id||null;S.delArmed=false;setDelLabel();
   $("dtitle").textContent=o?"Edit opportunity":"New opportunity";
   var v=o||{stage:"Identified",lead:"",segment:"",tw:"Not indicated"};
-  $("f-account").value=v.account||"";$("f-opp").value=v.opportunity||"";
+  $("f-account").value=v.account||"";$("f-opp").value=v.opportunity||"";$("f-oppnum").value=v.oppNumber||"";
   $("f-stage").value=v.stage||"Identified";$("f-segment").value=v.segment||"";$("f-lead").value=v.lead||"";
   $("f-seller").value=v.seller||"";$("f-tw").value=v.tw||"Not indicated";$("f-close").value=v.closeDate||"";
   $("f-size").value=v.size==null?"":v.size;$("f-gm").value=v.gmPct==null?"":v.gmPct;
@@ -382,7 +383,7 @@ function openDrawer(id){
   var who=o&&(o.updatedBy||"").split("@")[0];
   $("dmeta").textContent=o&&o.updatedAt?"Last saved "+new Date(o.updatedAt).toLocaleDateString("en-US",{month:"short",day:"numeric"})+(who?" by "+who:""):"";
   $("ddel").hidden=!o||!S.canWrite;$("dsave").hidden=!S.canWrite;$("dreq").hidden=!o||!S.canWrite;
-  ["f-account","f-opp","f-stage","f-segment","f-lead","f-seller","f-tw","f-close","f-size","f-gm","f-next","f-notes"].forEach(function(i){$(i).disabled=!S.canWrite});
+  ["f-account","f-opp","f-oppnum","f-stage","f-segment","f-lead","f-seller","f-tw","f-close","f-size","f-gm","f-next","f-notes"].forEach(function(i){$(i).disabled=!S.canWrite});
   updatePreview();loadHistory(o);
   $("scrim").hidden=false;$("drawer").hidden=false;
   setTimeout(function(){$("f-account").focus()},30);
@@ -411,7 +412,7 @@ function loadHistory(o){
    The only thing the server stores is the seller's email address, once, in the seller directory. */
 /* Summarizes exactly what the tracker has on file, including "Not on file" for the fields we ask
    sellers to fill in most often, so a stale or blank field gets fixed instead of silently staying
-   wrong. Segment and lead are left out when blank; they are classification, not something we chase.
+   wrong. Segment, lead and Opportunity # are left out when blank; they are not something we chase.
    At Account planning no size or close is expected (dash-calc.js does not count it as a gap), so those
    two are shown only when set, never chased. The opening line asks to fill gaps only when there are some. */
 function updateMailBody(d){
@@ -422,6 +423,7 @@ function updateMailBody(d){
   }
   body.push("Account: "+(d.account||""));
   if(d.opportunity)body.push("Opportunity: "+d.opportunity);
+  if(d.oppNumber)body.push("Opportunity #: "+d.oppNumber);
   body.push("Stage: "+d.stage);
   field("Deal size",d.size==null?"":full(d.size),!planning);
   field("Expected close",d.closeDate?shortDate(d.closeDate):"",!planning);

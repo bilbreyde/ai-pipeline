@@ -14,6 +14,10 @@ export const DEFAULT_SETTINGS = Object.freeze({
 const TEXT_RULES = {
   account: [1, 120],
   opportunity: [0, 800],
+  // A reference number from wherever the deal is also tracked (a CRM, a quoting tool). Free text on
+  // purpose: this app does not assign or own the number, it just stores it so the two systems can be
+  // cross referenced. Not a data gap when blank; it is optional context, not something every deal has.
+  oppNumber: [0, 40],
   segment: [0, 60],
   seller: [0, 80],
   nextStep: [0, 800],
@@ -21,12 +25,12 @@ const TEXT_RULES = {
 };
 
 export const OPP_FIELDS = [
-  "account", "opportunity", "stage", "segment", "lead", "seller",
+  "account", "opportunity", "oppNumber", "stage", "segment", "lead", "seller",
   "tw", "size", "gmPct", "closeDate", "nextStep", "notes",
 ];
 
 const DEFAULTS = {
-  opportunity: "", stage: "Identified", segment: "", lead: "", seller: "",
+  opportunity: "", oppNumber: "", stage: "Identified", segment: "", lead: "", seller: "",
   tw: "Not indicated", size: null, gmPct: null, closeDate: "", nextStep: "", notes: "",
 };
 

@@ -1,38 +1,74 @@
-# Request update: summary + ask for missing fields — overlay
+# Opportunity # — overlay
 
-Changes what the **Request update** button puts in the draft email. It used to send a short "send
-a status update" note with account, stage, and close/next step only if they happened to be set.
-Now it sends a full summary of everything the tracker has on that deal (account, opportunity,
-stage, deal size, expected close, next step, and segment/lead when set), and any of deal size,
-expected close or next step that is blank is shown as "Not on file", with the opening line asking
-the seller to fill those in. This lets the seller both correct anything wrong in the summary and
-fill in what is missing, in one email.
+Adds an **Opportunity #** field: a free text reference number from wherever the deal is
+tracked elsewhere (your CRM, a quoting tool). The tracker doesn't assign or validate it,
+it just stores it and lets you search by it, so you can cross reference a row here with
+the same deal in that other system. It is optional; a blank one is not a data gap.
 
-Nothing about how the email is sent changed: it is still only a `mailto:` link built in the
-browser, nothing is stored or sent from the server.
+Where it shows up:
+
+* A new field in the opportunity drawer, right under Opportunity.
+* The table: shown in small muted text next to the account name when set, nothing shown
+  when it's blank.
+* Search: typing a number in the search box now matches it, same as account or seller.
+* Export/Import: a new "Opportunity #" column in the Pipeline sheet, round trips both
+  ways, matched by its own header text so it can't be confused with the "Opportunity"
+  column regardless of column order.
+* Request update email: included as its own line when set, same treatment as the
+  Opportunity line (not flagged "Not on file" when blank — it's optional context, not
+  something every deal has).
 
 ## Apply
 
-Two files, both replace what is already there:
+Nine files. All replace what is already there:
 
 ```
+src/lib/validate.js
+src/lib/xlsx.js
+src/lib/sample-data.js
+test/xlsx.test.mjs
+web/index.html
 web/app.js
+web/app.css
 README.md
+CLAUDE.md
 ```
 
 ## Verify
 
 ```powershell
-npm test        # 135 tests, unaffected by this change
+npm test        # 136 tests (one new xlsx test added for this feature)
 npm run dev
 ```
 
-Open an opportunity with every field filled in (Fabrikam Logistics in the sample data) and click
-Request update: the draft should show every field with real values, no "Not on file" anywhere.
-Then try one with a gap, like Wingtip Retail (has a size and a next step, no close date): the
-draft should read "Expected close: Not on file" while the other two show their real values.
+In the browser: open Fabrikam Logistics, confirm Opportunity # shows "CRM-10391" in the
+drawer and next to the account name in the table. Search "CRM-10391" and confirm only
+that row shows. Add a new opportunity, set an Opportunity #, save, and confirm it shows
+in the table and survives a reopen. Click Request update on a row with an Opportunity #
+set and confirm the draft email includes an "Opportunity #:" line.
+
+Export the pipeline to Excel and confirm the new "Opportunity #" column is there,
+separate from "Opportunity". Edit a cell, re-import, confirm it updates that one field.
 
 ## What changed
 
-`updateMailBody` in `web/app.js` is the only function touched. `README.md`'s "Request update from
-the seller" section describes the new email content.
+`src/lib/validate.js` — new `oppNumber` field: optional text, 40 characters max.
+
+`src/lib/xlsx.js` — new "Opportunity #" export column, placed right before the computed
+Est. margin column (kept the index shifts in the existing tests small). The header
+matcher was hardened to check for an exact header match before falling back to its
+fuzzy prefix match, since "Opportunity #" is a superstring of "Opportunity"'s match
+prefix — without that fix, column order in an uploaded sheet could cross the two fields.
+
+`src/lib/sample-data.js` — five of the eleven sample opportunities now carry a
+representative Opportunity #, the rest are left blank to show the optional state.
+
+`test/xlsx.test.mjs` — two existing tests' hardcoded column indices shifted for the new
+column, plus a new test that builds a sheet with Opportunity # before Opportunity in
+column order and confirms import still maps each to the right field.
+
+`web/index.html`, `web/app.js`, `web/app.css` — the drawer field, table display, search,
+and the Request update email line described above.
+
+`README.md`, `CLAUDE.md` — documented the field and, in CLAUDE.md, the header-matching
+trap so a future column addition doesn't reintroduce it.

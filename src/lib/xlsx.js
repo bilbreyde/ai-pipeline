@@ -48,6 +48,7 @@ const COLUMNS = [
   { key: "closeDate", header: "Close date", width: 12, fmt: "yyyy-mm-dd" },
   { key: "nextStep", header: "Next step", width: 44, wrap: true },
   { key: "notes", header: "Notes", width: 44, wrap: true },
+  { key: "oppNumber", header: "Opportunity #", width: 18 },
   { key: "margin", header: "Est. margin (formula)", width: 18, fmt: MONEY, computed: true },
   { key: "updated", header: "Last updated (ignored on import)", width: 30, computed: true },
   { key: "id", header: "Id (do not edit)", width: 38, computed: true },
@@ -107,6 +108,7 @@ export async function buildWorkbook({ opps, settings, now = new Date() }) {
       closeDate: o.closeDate ? new Date(`${o.closeDate}T00:00:00Z`) : null,
       nextStep: o.nextStep ?? "",
       notes: o.notes ?? "",
+      oppNumber: o.oppNumber ?? "",
       margin: {
         formula:
           `IF(${L.size}${r}="","",IF(${A}$B$2="cost",` +
@@ -191,8 +193,8 @@ export async function buildWorkbook({ opps, settings, now = new Date() }) {
 // ---------------------------------------------------------------------------------------------
 
 const PIPELINE_PREFIXES = {
-  account: "account", opportunity: "opportunity", stage: "stage", segment: "segment", lead: "lead",
-  seller: "seller", tw: "thoughtworks", size: "deal size", gmPct: "gm", closeDate: "close",
+  account: "account", opportunity: "opportunity", oppNumber: "opportunity #", stage: "stage", segment: "segment",
+  lead: "lead", seller: "seller", tw: "thoughtworks", size: "deal size", gmPct: "gm", closeDate: "close",
   nextStep: "next step", notes: "notes", id: "id",
 };
 const LEGACY_PREFIXES = {
@@ -223,11 +225,21 @@ function inspectSheet(ws) {
     const t = textOf(cellValue(cell)).toLowerCase();
     if (t && !(t in headers)) headers[t] = col;
   });
-  const find = (prefix) => {
-    const k = Object.keys(headers).find((h) => h.startsWith(prefix));
+  // An exact header match wins over a fuzzy one, so "Opportunity #" can never be mistaken for the
+  // "Opportunity" description column (or vice versa) regardless of which order they appear in.
+  // The fuzzy fallback also skips a header that belongs to a longer prefix in the same layout, so a
+  // sheet with "Opportunity #" but no "Opportunity" column leaves the description alone instead of
+  // overwriting it with the number.
+  const find = (prefix, siblings = []) => {
+    if (prefix in headers) return headers[prefix];
+    const longer = siblings.filter((q) => q !== prefix && q.startsWith(prefix));
+    const k = Object.keys(headers).find((h) => h.startsWith(prefix) && !longer.some((q) => h.startsWith(q)));
     return k ? headers[k] : null;
   };
-  const cols = (prefixes) => Object.fromEntries(Object.entries(prefixes).map(([k, p]) => [k, find(p)]));
+  const cols = (prefixes) => {
+    const all = Object.values(prefixes);
+    return Object.fromEntries(Object.entries(prefixes).map(([k, p]) => [k, find(p, all)]));
+  };
   if (find("account") && find("stage")) return { format: "pipeline", cols: cols(PIPELINE_PREFIXES) };
   if (find("account") && find("status")) return { format: "legacy", cols: cols(LEGACY_PREFIXES) };
   return null;
@@ -266,7 +278,7 @@ const pick = (list, text) => list.find((x) => x.toLowerCase() === text.toLowerCa
 function readPipelineRow(get) {
   const out = { fields: {}, createOnly: {}, warnings: [], errors: [], id: "" };
   const f = out.fields;
-  for (const k of ["account", "opportunity", "segment", "seller", "nextStep", "notes"]) {
+  for (const k of ["account", "opportunity", "oppNumber", "segment", "seller", "nextStep", "notes"]) {
     if (get(k) !== undefined) f[k] = textOf(get(k));
   }
   if (get("account") !== undefined && !f.account) out.errors.push("Account is blank.");

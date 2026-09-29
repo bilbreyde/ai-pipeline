@@ -63,7 +63,7 @@
 
   <section>
     <div class="toolbar" role="search">
-      <input type="search" id="q" placeholder="Search account, seller, next step" aria-label="Search opportunities">
+      <input type="search" id="q" placeholder="Search account, opportunity #, seller, next step" aria-label="Search opportunities">
       <select id="fStage" aria-label="Stage filter"></select>
       <select id="fLead" aria-label="Lead filter"></select>
       <select id="fSeg" aria-label="Segment filter"></select>
@@ -106,6 +106,7 @@
   <form id="dform" autocomplete="off">
     <label class="full">Account<input type="text" id="f-account" required></label>
     <label class="full">Opportunity<textarea id="f-opp"></textarea></label>
+    <label>Opportunity #<input type="text" id="f-oppnum" placeholder="Number from your CRM or quoting tool"></label>
     <label>Stage<select id="f-stage"></select></label>
     <label>Segment<select id="f-segment"></select></label>
     <label>Lead<select id="f-lead"></select></label>

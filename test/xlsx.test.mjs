@@ -31,7 +31,7 @@ test("export: header, one row per opportunity, formulas with cached results, ass
   assert.equal(ws.getRow(1).getCell(1).fill.fgColor.argb, "FF003087");
   assert.equal(ws.actualRowCount, opps.length + 1);
   const sized = ws.getRows(2, opps.length).find((r) => typeof r.getCell(8).value === "number");
-  const m = sized.getCell(13).value;
+  const m = sized.getCell(14).value;
   assert.match(m.formula, /^IF\(H\d+="",""/);
   assert.equal(m.result, sized.getCell(8).value * 0.3);
   const as = wb.getWorksheet("Assumptions");
@@ -40,6 +40,44 @@ test("export: header, one row per opportunity, formulas with cached results, ass
   assert.equal(as.getCell("A5").value, "Open pipeline (everything except Won and Lost)");
   assert.equal(as.getCell("A6").value, "Deal size");
   assert.equal(as.getCell("A7").value, "Est. margin");
+});
+
+test("Opportunity # exports as its own column, distinct from Opportunity, and round trips both orders", async () => {
+  const opps = [{ id: "x1", account: "Fabrikam", opportunity: "Route optimization", oppNumber: "CRM-48213", stage: "Identified", size: null }];
+  const wb = await load(await buildWorkbook({ opps, settings }));
+  const ws = wb.getWorksheet("Pipeline");
+  const headerRow = ws.getRow(1).values.map((v) => String(v ?? ""));
+  const oppCol = headerRow.indexOf("Opportunity");
+  const numCol = headerRow.indexOf("Opportunity #");
+  assert.ok(oppCol > 0 && numCol > 0 && oppCol !== numCol);
+  assert.equal(ws.getRow(2).getCell(oppCol).value, "Route optimization");
+  assert.equal(ws.getRow(2).getCell(numCol).value, "CRM-48213");
+
+  // Reading it back must not cross the two up, whichever column comes first in the sheet.
+  const parsed = await parseWorkbook(await save(wb));
+  const [row] = parsed.rows;
+  assert.equal(row.fields.opportunity, "Route optimization");
+  assert.equal(row.fields.oppNumber, "CRM-48213");
+
+  // Swap the two columns' positions by rebuilding the header and moving the data. The importer reads
+  // by header text, not position, so this must still map correctly.
+  const swapped = new ExcelJS.Workbook();
+  const sw = swapped.addWorksheet("Pipeline");
+  sw.addRow(["Account", "Opportunity #", "Opportunity", "Stage"]);
+  sw.addRow(["Fabrikam", "CRM-48213", "Route optimization", "Identified"]);
+  const reparsed = await parseWorkbook(await save(swapped));
+  assert.equal(reparsed.rows[0].fields.opportunity, "Route optimization");
+  assert.equal(reparsed.rows[0].fields.oppNumber, "CRM-48213");
+
+  // With no Opportunity column at all, the number must not fall through to the description field,
+  // or import would overwrite every description with its CRM number.
+  const numberOnly = new ExcelJS.Workbook();
+  const nw = numberOnly.addWorksheet("Pipeline");
+  nw.addRow(["Account", "Opportunity # (CRM)", "Stage"]);
+  nw.addRow(["Fabrikam", "CRM-48213", "Identified"]);
+  const onlyNum = await parseWorkbook(await save(numberOnly));
+  assert.equal(onlyNum.rows[0].fields.opportunity, undefined);
+  assert.equal(onlyNum.rows[0].fields.oppNumber, "CRM-48213");
 });
 
 test("round trip: export then import into an empty tracker recreates every field and id", async () => {
@@ -73,7 +111,7 @@ test("editing cells in Excel updates only the changed fields, and blank clears o
   const wb = await load(await buildWorkbook({ opps: before, settings }));
   const ws = wb.getWorksheet("Pipeline");
   const row = ws.getRow(2);
-  const id = row.getCell(15).value; // 15 columns now that "Weighted margin (formula)" is gone
+  const id = row.getCell(16).value; // 16 columns now that Opportunity # was added
   row.getCell(3).value = "Won";      // stage
   row.getCell(8).value = 123456;     // deal size
   row.getCell(6).value = null;       // seller cleared
