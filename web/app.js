@@ -211,7 +211,14 @@ function renderTable(){
       if(o.tw==="Engaged"||o.tw==="Strong fit"||o.tw==="Target")tags+='<span class="tag tw">TW '+esc(o.tw.toLowerCase())+'</span>';
       if(o.activityCount)tags+='<span class="tag mtg" title="Meeting history, last on '+esc(new Date(o.lastActivityAt).toLocaleDateString("en-US",{month:"short",day:"numeric"}))+'">'+o.activityCount+(o.activityCount===1?" meeting":" meetings")+'</span>';
       var cd=parseDate(o.closeDate),late=cd&&isOpen(o)&&cd<today;
-      var age=daysAgo(o.updatedAt),stale=age!=null&&age>14&&isOpen(o);
+      var age=daysAgo(o.updatedAt);
+      // Three escalating tiers on how long an open opportunity has gone untouched: a light flag at a week,
+      // a harder one at two weeks, and a flashing one past three, so a deal nobody has looked at stands out
+      // in the table without having to sort by Updated. Closed deals (Won/Lost) are never flagged: nobody
+      // needs to be nagged to update something that's already done.
+      var staleTier=(age!=null&&isOpen(o))?(age>=21?3:age>=14?2:age>=7?1:0):0;
+      var staleCls=["","stale-7","stale-14","stale-21"][staleTier];
+      var staleTitle=staleTier?" title=\"Not updated in "+age+" days\"":"";
       var who=(o.updatedBy||"").split("@")[0];
       var updTxt=age==null?"":(age<=0?"Today":age===1?"Yesterday":age+"d ago")+(who?" · "+esc(who.split(" ")[0]):"");
       var gmNote=o.gmPct!=null?' <span class="tag tw" title="GM% override">'+gmOf(o)+'% GM</span>':"";
@@ -226,7 +233,7 @@ function renderTable(){
         '<td class="num">'+(m==null?'<span class="na">–</span>':full(m))+'</td>'+
         '<td class="next"><div title="'+esc(o.nextStep||"")+'">'+esc(o.nextStep||"")+'</div></td>'+
         '<td class="date'+(late?" late":"")+'">'+(cd?fmtDate(cd)+(late?" (overdue)":""):'<span class="na">–</span>')+'</td>'+
-        '<td class="upd'+(stale?" stale":"")+'">'+updTxt+'</td></tr>';
+        '<td class="upd">'+(staleCls?'<span class="'+staleCls+'"'+staleTitle+'>'+updTxt+'</span>':updTxt)+'</td></tr>';
     }).join("");
   }
   var ts=0,tm=0,n=0;

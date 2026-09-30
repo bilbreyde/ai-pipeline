@@ -160,7 +160,17 @@ tbody tr.closed{opacity:.62}
 .date.late{color:var(--crit);font-weight:600}
 .date .na{color:var(--ink-3)}
 .upd{font-size:12px;color:var(--ink-3);white-space:nowrap}
-.upd.stale{color:var(--warn)}
+/* Three escalating tiers of "nobody has touched this deal in a while", 7/14/21+ days. The flag is a span
+   inside the cell, so the cell keeps its normal padding and lines up with the rest of the row. warn/crit
+   on their -soft backgrounds are contrast checked for every theme in test/theme-contrast.test.mjs.
+   stale-21 pulses only a ring around the flag; the text and its background never change, so that
+   checked pairing holds at every point in the pulse. */
+.upd .stale-7,.upd .stale-14,.upd .stale-21{display:inline-block;font-weight:600;border-radius:4px;padding:2px 6px;margin:-2px -6px}
+.upd .stale-7{color:var(--warn);background:var(--warn-soft)}
+.upd .stale-14,.upd .stale-21{color:var(--crit);background:var(--crit-soft)}
+.upd .stale-21{animation:upd-flash 1.4s ease-in-out infinite}
+@keyframes upd-flash{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 0 2px var(--crit)}}
+@media (prefers-reduced-motion: reduce){.upd .stale-21{animation:none;box-shadow:0 0 0 2px var(--crit)}}
 tfoot td{background:var(--surface-2);font-weight:600;border-bottom:0;padding-block:12px}
 tfoot td.lbl{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
 .empty{padding:40px 16px;text-align:center;color:var(--ink-3)}

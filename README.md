@@ -100,6 +100,10 @@ The Dashboard tab sits next to Pipeline (`#dashboard` in the URL is linkable). O
 
 Read the numbers with two caveats. Open deals with no size are counted in deal counts but cannot add to any dollar figure, and the cards say how many were left out. There is also no trend over time, because the app stores the current state only. Trends need weekly snapshots, which is a separate piece of work.
 
+## Staleness flags
+
+In the Pipeline table, the Updated column flags an open opportunity nobody has touched in a while, in three steps: light yellow at 7 days, red at 14, and flashing red at 21 and over. This is a nudge to check in on a deal that has gone quiet, not a data quality flag, so it never counts toward Rows with gaps or the gap tags on a row (No size, No seller, No next step). It also never applies to Won or Lost deals; a closed deal isn't going anywhere. Hover the date for the exact day count. The flashing on the 21+ tier respects your OS's reduced motion setting, and shows a steady outline instead.
+
 ## Transcripts
 
 The **From transcript** button takes meeting notes or a Teams transcript and turns them into a reviewable proposal. Paste text, choose a file (`.txt`, `.vtt`, `.srt`, `.docx`), or drop a file anywhere on the page. Two modes:
