@@ -63,14 +63,18 @@ const respond = (status, payload, extra = {}) => ({
 const fail = (status, message, details) => respond(status, details?.length ? { error: message, details } : { error: message });
 
 /**
- * Who made the request. Checks our own session cookie first (username and password sign in,
- * see auth.js and scripts/manage-users.mjs), then falls back to the header Azure App Service
- * Authentication sets when Entra sign in is configured in front of this Function App, so a
- * tenant that can turn Entra on later needs no code change to use it instead. Anonymous, "", when
- * neither is present. A session whose user account has been deleted (access revoked) or whose
- * session has expired is treated as anonymous, never as a stale identity.
+ * Who made the request: the user behind our own session cookie (username and password sign in,
+ * see auth.js and scripts/manage-users.mjs), or anonymous, "". A session whose user account has
+ * been deleted (access revoked) or whose session has expired is treated as anonymous, never as a
+ * stale identity.
+ *
+ * trustPrincipalHeader: also accept x-ms-client-principal-name as the identity. Only the tests and
+ * the local dev server set it. Never set it in src/functions/router.js: this Function App is
+ * public and anonymous, so any caller can send that header, and trusting it lets anyone past the
+ * sign in gate. It is only safe behind App Service Authentication that requires sign in and
+ * strips client supplied copies of the header.
  */
-export async function resolveActor(headers, store) {
+export async function resolveActor(headers, store, { trustPrincipalHeader = false } = {}) {
   const token = parseCookies(headers["cookie"])[SESSION_COOKIE];
   if (token) {
     const session = await store.getSession(token);
@@ -79,6 +83,7 @@ export async function resolveActor(headers, store) {
       if (user) return user.username;
     }
   }
+  if (!trustPrincipalHeader) return "";
   const raw = headers["x-ms-client-principal-name"];
   return typeof raw === "string" ? raw.trim().slice(0, 120) : "";
 }
@@ -109,8 +114,9 @@ function crossSiteBlocked(headers) {
  * Set true only for local development or for testing with fictional data; never with real data present.
  * ai: a Foundry client (or the local mock) with extract(), or null when the feature is not configured.
  * secureCookies: false only for local http development, where a Secure cookie would never be sent back.
+ * trustPrincipalHeader: tests and local dev only, see resolveActor. The Azure adapter never sets it.
  */
-export function createHandlers({ store, webRoot, log = () => {}, info = () => {}, allowAnonymousBulk = false, ai = null, secureCookies = true }) {
+export function createHandlers({ store, webRoot, log = () => {}, info = () => {}, allowAnonymousBulk = false, ai = null, secureCookies = true, trustPrincipalHeader = false }) {
   const fileCache = new Map();
   // A fixed decoy so a login attempt for a username that does not exist still pays the same scrypt
   // cost as a real one, rather than returning early and letting response time reveal which is true.
@@ -433,7 +439,7 @@ export function createHandlers({ store, webRoot, log = () => {}, info = () => {}
 
   async function handleApi(rel, req) {
     const method = req.method;
-    const actor = await resolveActor(req.headers, store);
+    const actor = await resolveActor(req.headers, store, { trustPrincipalHeader });
     const parts = rel.split("/").slice(1); // drop "api"
     const [resource, id, ...extra] = parts;
 

@@ -299,6 +299,29 @@ test("deleteSessionsFor removes every session for a username, or all but one", a
   assert.ok(await store.getSession("b1"));
 });
 
+test("a forged x-ms-client-principal-name header is refused: no data, no identity, no writes", async () => {
+  const { call, store } = await setup(); // the production default: trustPrincipalHeader off
+  const forged = { "x-ms-client-principal-name": "attacker@example.com" };
+  const read = await call("GET", "/api/opps", undefined, forged);
+  assert.equal(read.status, 403);
+  assert.equal(json(read).error, "Sign in to see or change pipeline data.");
+  assert.equal((await call("POST", "/api/opps", { account: "Forged" }, forged)).status, 403);
+  assert.equal((await call("GET", "/api/export", undefined, forged)).status, 403);
+  assert.deepEqual(await store.list(), []);
+  const me = json(await call("GET", "/api/me", undefined, forged));
+  assert.equal(me.authenticated, false);
+  assert.equal(me.name, "");
+});
+
+test("a forged header does not override a real session's identity", async () => {
+  const { call, store } = await setup();
+  await createAccount(store, "don", "correct horse battery staple");
+  const token = cookieValue(await call("POST", "/api/auth/login", { username: "don", password: "correct horse battery staple" }));
+  const r = await call("POST", "/api/opps", { account: "Contoso" }, { ...withCookie(token), "x-ms-client-principal-name": "attacker@example.com" });
+  assert.equal(r.status, 201);
+  assert.equal(json(r).item.createdBy, "don");
+});
+
 test("auth routes still require same origin and JSON content type", async () => {
   const { call } = await setup();
   assert.equal((await call("POST", "/api/auth/login", { username: "a", password: "b" }, { "sec-fetch-site": "cross-site" })).status, 403);

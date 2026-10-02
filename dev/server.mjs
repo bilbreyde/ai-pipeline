@@ -34,7 +34,7 @@ if (process.env.DEV_LOGIN_USER && process.env.DEV_LOGIN_PASSWORD) {
 const ai = process.env.AI === "off" ? null : (await aiFromEnv(process.env, (m) => console.error(m))) ?? createMockAi();
 // secureCookies is off here because this server is always plain http. Azure always gets https, so
 // the real app never sets this to false; see src/functions/router.js.
-const api = createHandlers({ store, webRoot, log: (m) => console.error(m), info: (m) => console.log(m), allowAnonymousBulk: process.env.ALLOW_ANONYMOUS_BULK !== "false", ai, secureCookies: false });
+const api = createHandlers({ store, webRoot, log: (m) => console.error(m), info: (m) => console.log(m), allowAnonymousBulk: process.env.ALLOW_ANONYMOUS_BULK !== "false", ai, secureCookies: false, trustPrincipalHeader: Boolean(process.env.DEV_USER) });
 
 const server = http.createServer(async (req, res) => {
   const chunks = [];

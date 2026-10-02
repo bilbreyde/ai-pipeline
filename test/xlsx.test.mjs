@@ -238,7 +238,7 @@ async function api({ allowAnonymousBulk = false } = {}) {
   const webRoot = await mkdtemp(path.join(os.tmpdir(), "web-"));
   await writeFile(path.join(webRoot, "index.html"), "x");
   const store = await seeded();
-  const { handle } = createHandlers({ store, webRoot, allowAnonymousBulk });
+  const { handle } = createHandlers({ store, webRoot, allowAnonymousBulk, trustPrincipalHeader: true });
   const call = (method, p, body, headers = {}) => handle({
     method, path: p,
     headers: { "content-type": "application/json", ...headers },

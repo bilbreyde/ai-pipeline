@@ -17,7 +17,7 @@ async function setup({ allowAnonymousBulk = true } = {}) {
   await writeFile(path.join(webRoot, "app.css"), "body{}");
   await writeFile(path.join(webRoot, "secret.txt"), "nope");
   const store = createMemoryStore();
-  const { handle } = createHandlers({ store, webRoot, allowAnonymousBulk });
+  const { handle } = createHandlers({ store, webRoot, allowAnonymousBulk, trustPrincipalHeader: true });
   const call = (method, p, body, headers = {}) =>
     handle({
       method, path: p,

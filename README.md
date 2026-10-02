@@ -90,7 +90,7 @@ In the browser: Sign in top right, or a full sign in screen if the whole app req
 
 Under the hood: passwords are hashed with Node's built in `scrypt`, never logged or stored in the clear. A session is an opaque random token, not a signed one, stored in Cosmos and looked up on every request, which is what makes `revoke` an immediate, real revocation instead of a rotate-the-signing-key exercise. The session cookie is `HttpOnly`, `SameSite=Strict`, `Secure` everywhere except plain http local dev, and lasts 24 hours from sign in.
 
-If this ever moves to a tenant where an Entra app registration is possible, turning on App Service Authentication needs no code change: `resolveActor` already checks for the `x-ms-client-principal-name` header Entra sets, it is just second, after the session cookie, in what it checks.
+If this ever moves to a tenant where an Entra app registration is possible, turn on App Service Authentication with sign in required for every request, then pass `trustPrincipalHeader: true` to `createHandlers` in `src/functions/router.js`. Never set it before that: without Authentication in front, anyone can send the `x-ms-client-principal-name` header themselves, so the app accepts only its own session cookie by default.
 
 ## Themes and Dashboard
 

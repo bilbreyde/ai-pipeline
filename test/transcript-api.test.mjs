@@ -19,7 +19,7 @@ async function setup({ ai = createMockAi(), allowAnonymousBulk = false, seed = t
   const store = createMemoryStore();
   if (seed) for (const o of SAMPLE_OPPS) await store.upsert({ ...o, createdAt: "2026-09-01T00:00:00.000Z", updatedAt: "2026-09-01T00:00:00.000Z", updatedBy: "sample" });
   const infos = [];
-  const { handle } = createHandlers({ store, webRoot, ai, allowAnonymousBulk, info: (m) => infos.push(m) });
+  const { handle } = createHandlers({ store, webRoot, ai, allowAnonymousBulk, trustPrincipalHeader: true, info: (m) => infos.push(m) });
   const call = (method, p, body, headers = ME) =>
     handle({ method, path: p, headers: { "content-type": "application/json", ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
   return { call, store, infos };
