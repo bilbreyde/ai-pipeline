@@ -88,6 +88,8 @@ if (-not $SkipInfra) {
   Assert-Exit 'az deployment group create'
 
   @(
+    "TENANT_ID=$TenantId"
+    "SUBSCRIPTION_ID=$SubscriptionId"
     "COSMOS_ENDPOINT=$($outputs.cosmosEndpoint.value)"
     "COSMOS_DATABASE=$($outputs.cosmosDatabase.value)"
     "COSMOS_CONTAINER=$($outputs.cosmosContainer.value)"
@@ -100,6 +102,13 @@ if (-not $SkipInfra) {
 if (-not (Test-Path $outFile)) { throw "$outFile not found. Run once without -SkipInfra first." }
 $cfg = @{}
 Get-Content $outFile | ForEach-Object { if ($_ -match '^([A-Z_]+)=(.*)$') { $cfg[$Matches[1]] = $Matches[2] } }
+# scripts/env.mjs refuses to touch Cosmos unless az matches these. An .env.deploy written before they
+# were recorded gets them here, from the tenant and subscription this run has just verified.
+if (-not $cfg.ContainsKey('TENANT_ID') -or -not $cfg.ContainsKey('SUBSCRIPTION_ID')) {
+  Add-Content -Path $outFile -Value @("TENANT_ID=$TenantId", "SUBSCRIPTION_ID=$SubscriptionId") -Encoding utf8
+  $cfg['TENANT_ID'] = $TenantId
+  $cfg['SUBSCRIPTION_ID'] = $SubscriptionId
+}
 
 # ---------- 4. Code ----------
 if (-not $SkipCode) {
