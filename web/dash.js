@@ -410,7 +410,7 @@ function build() {
     ]));
     var btn = gaps.body.querySelector("#dashShowGaps");
     if (btn && last && last.hooks) btn.addEventListener("click", last.hooks.showGaps);
-    gaps.sub.textContent = "Open pipeline only. Gaps here are the ones that make the totals wrong.";
+    gaps.sub.textContent = "Open rows, Prospecting included. Gaps here are the ones that make the totals wrong.";
     gaps.specs = [{
       caption: "Open rows with a data gap", head: ["Check", "Rows", "Of open rows"],
       rows: items.map(function (i) { return [i.k, String(i.v), String(n)]; })
@@ -421,6 +421,7 @@ function build() {
 }
 
 /* ---------- KPI row and filters ---------- */
+var SCOPE_NOTE = "Won and lost deals count only in the tiles. Prospecting and Unqualified are in no total.";
 function renderKpis(data) {
   var k = data.kpi, box = $("dashKpis");
   clear(box);
@@ -461,7 +462,7 @@ function syncFilters(ctx, data) {
     b.tabIndex = on ? 0 : -1;
   });
   var total = ctx.opps.length, shown = data.scopedCount;
-  $("dScope").textContent = (D.lead || D.seg) ? "Showing " + shown + " of " + total + " opportunities. Won and lost deals count only in the tiles." : "Won and lost deals count only in the tiles.";
+  $("dScope").textContent = (D.lead || D.seg) ? "Showing " + shown + " of " + total + " opportunities. " + SCOPE_NOTE : SCOPE_NOTE;
 }
 
 /* ---------- public ---------- */

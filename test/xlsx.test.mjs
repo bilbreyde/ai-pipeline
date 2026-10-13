@@ -6,7 +6,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import ExcelJS from "exceljs";
 import { createHandlers } from "../src/lib/handlers.js";
 import { createMemoryStore } from "../src/lib/store-memory.js";
-import { DEFAULT_SETTINGS, OPP_FIELDS } from "../src/lib/validate.js";
+import { DEFAULT_SETTINGS, OPEN_STAGES, OPP_FIELDS } from "../src/lib/validate.js";
 import { SAMPLE_OPPS } from "../src/lib/sample-data.js";
 import { applyPlan, buildWorkbook, describePlan, parseWorkbook, planImport, XLSX_TYPE } from "../src/lib/xlsx.js";
 
@@ -37,7 +37,7 @@ test("export: header, one row per opportunity, formulas with cached results, ass
   const as = wb.getWorksheet("Assumptions");
   assert.equal(as.getCell("B2").value, "price");
   assert.equal(as.getCell("B3").value, 30);
-  assert.equal(as.getCell("A5").value, "Open pipeline (everything except Won and Lost)");
+  assert.equal(as.getCell("A5").value, "Open pipeline (excludes Prospecting, Won, Lost and Unqualified)");
   assert.equal(as.getCell("A6").value, "Deal size");
   assert.equal(as.getCell("A7").value, "Est. margin");
 });
@@ -95,6 +95,28 @@ test("round trip: export then import into an empty tracker recreates every field
   assert.deepEqual(byId(await b.list()), byId(await a.list()));
   const any = (await b.list())[0];
   assert.equal(any.createdBy, "tester");
+});
+
+test("Prospecting and Unqualified round trip, and the Excel totals leave both out", async () => {
+  const extra = [
+    { id: "x-prospect", account: "Prospect Co", opportunity: "Exploratory", oppNumber: "", stage: "Prospecting", segment: "", lead: "", seller: "Avery", tw: "Not indicated", size: 500000, gmPct: null, closeDate: "", nextStep: "Intro call", notes: "" },
+    { id: "x-unq", account: "Unqualified Co", opportunity: "No budget", oppNumber: "", stage: "Unqualified", segment: "", lead: "", seller: "Casey", tw: "Not indicated", size: 70000, gmPct: null, closeDate: "", nextStep: "", notes: "" },
+  ];
+  const a = await seeded([...SAMPLE_OPPS, ...extra]);
+  const buf = await buildWorkbook({ opps: await a.list(), settings });
+  const b = createMemoryStore();
+  const res = await applyPlan(b, planImport(await parseWorkbook(buf), await b.list()), "tester");
+  assert.deepEqual(res.failed, []);
+  const back = Object.fromEntries((await b.list()).map((o) => [o.id, o]));
+  assert.equal(back["x-prospect"].stage, "Prospecting");
+  assert.equal(back["x-prospect"].size, 500000); // stored even though it is never counted
+  assert.equal(back["x-unq"].stage, "Unqualified");
+
+  const as = (await load(buf)).getWorksheet("Assumptions");
+  const counted = SAMPLE_OPPS.filter((o) => OPEN_STAGES.includes(o.stage)).reduce((s, o) => s + (o.size ?? 0), 0);
+  assert.equal(as.getCell("B6").value.result, counted);
+  for (const s of OPEN_STAGES) assert.ok(as.getCell("B6").value.formula.includes(`"${s}"`), s);
+  assert.ok(!/Prospecting|Unqualified|Won|Lost/.test(as.getCell("B6").value.formula));
 });
 
 test("re-importing the same export changes nothing", async () => {

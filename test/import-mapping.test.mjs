@@ -19,6 +19,8 @@ test("mapStage reads wording, blocked and RFP beat generic active", () => {
     "Closed won": "Won",
     "Lost to incumbent": "Lost",
     "Wonderful progress": "Discovery",
+    "Unqualified": "Unqualified",
+    "Not qualified, no budget": "Unqualified",
   };
   for (const [input, want] of Object.entries(cases)) assert.equal(mapStage(input), want, input);
 });

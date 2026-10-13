@@ -3,14 +3,24 @@
 (function (root) {
 "use strict";
 
-var STAGES = ["Account planning", "Identified", "Discovery", "Qualified", "Proposal / RFP", "Blocked", "Won", "Lost"];
+var STAGES = ["Prospecting", "Account planning", "Identified", "Discovery", "Qualified", "Proposal / RFP", "Blocked", "Won", "Lost", "Unqualified"];
+/* Three categories, kept explicit so no caller has to guess what "open" means:
+   OPEN is the counted open pipeline, the only stages that feed any money rollup.
+   ACTIVE is everything still being worked: OPEN plus Prospecting, which is exploratory and never counted.
+   Staleness and data gaps follow ACTIVE. CLOSED is done; Unqualified is closed but is not a loss. */
 var OPEN = ["Account planning", "Identified", "Discovery", "Qualified", "Proposal / RFP", "Blocked"];
+var ACTIVE = ["Prospecting"].concat(OPEN);
+var CLOSED = ["Won", "Lost", "Unqualified"];
 var TW_ORDER = ["Engaged", "Strong fit", "Target", "Potential", "Not indicated", "Zones only"];
 var MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 var MEASURES = { margin: "Estimated margin", size: "Deal size" };
 
 /* ---------- per row math (the single source of truth for the page) ---------- */
 function isOpen(o) { return OPEN.indexOf(o.stage) > -1; }
+function isActive(o) { return ACTIVE.indexOf(o.stage) > -1; }
+function isClosed(o) { return CLOSED.indexOf(o.stage) > -1; }
+/** No size is expected at Prospecting or Account planning, so a blank one is not a gap there. */
+function sizeExpected(o) { return o.stage !== "Account planning" && o.stage !== "Prospecting"; }
 function gmOf(o, st) {
   var g = (o.gmPct == null || o.gmPct === "") ? st.defaultGm : Number(o.gmPct);
   return Math.min(90, Math.max(0, g || 0));
@@ -21,11 +31,11 @@ function marginOf(o, st) {
   return st.marginBasis === "cost" ? o.size / (1 - g) - o.size : o.size * g;
 }
 function gapsOf(o) {
-  if (!isOpen(o)) return [];
+  if (!isActive(o)) return [];
   var g = [];
-  // Account planning tracks accounts before there is a real opportunity, so no size is expected there,
-  // not a data gap. See README, Margin, so nobody is surprised.
-  if (o.size == null && o.stage !== "Account planning") g.push("No size");
+  // Prospecting and Account planning track accounts before there is a real opportunity, so no size is
+  // expected there, not a data gap. See README, Margin, so nobody is surprised.
+  if (o.size == null && sizeExpected(o)) g.push("No size");
   if (!o.seller) g.push("No seller");
   if (!o.nextStep) g.push("No next step");
   return g;
@@ -63,6 +73,8 @@ function build(opps, st, opts) {
     return true;
   });
   var open = scoped.filter(isOpen);
+  var active = scoped.filter(isActive);
+  // Unqualified is closed but never a loss, so it is in neither of these.
   var won = scoped.filter(function (o) { return o.stage === "Won"; });
   var lost = scoped.filter(function (o) { return o.stage === "Lost"; });
 
@@ -112,12 +124,12 @@ function build(opps, st, opts) {
   none.key = "none"; none.kind = "none"; none.label = "No date";
   timeline.push(later); timeline.push(none);
 
-  /* data gaps, open pipeline only */
-  var gaps = { open: open.length, noSize: 0, noSeller: 0, noNext: 0, overdue: 0, stale: 0, anyGap: 0 };
-  open.forEach(function (o) {
+  /* data gaps and staleness, every active row (Prospecting included, though it is never in a total) */
+  var gaps = { open: active.length, noSize: 0, noSeller: 0, noNext: 0, overdue: 0, stale: 0, anyGap: 0 };
+  active.forEach(function (o) {
     var g = gapsOf(o);
     if (g.length) gaps.anyGap++;
-    if (o.size == null && o.stage !== "Account planning") gaps.noSize++;
+    if (o.size == null && sizeExpected(o)) gaps.noSize++;
     if (!o.seller) gaps.noSeller++;
     if (!o.nextStep) gaps.noNext++;
     if (o.closeDate && o.closeDate < today) gaps.overdue++;
@@ -130,6 +142,7 @@ function build(opps, st, opts) {
   return {
     today: today,
     scopedCount: scoped.length,
+    prospecting: active.length - open.length,
     kpi: { open: openT, won: wonT, lost: lostT, blendedGm: blended },
     byStage: byStage, bySeller: bySeller, byLead: byLead, byTw: byTw,
     timeline: timeline, gaps: gaps, openDeals: open
@@ -185,8 +198,8 @@ function compact(n) {
 function full(n) { return n == null ? "" : "$" + Math.round(n).toLocaleString("en-US"); }
 
 root.DashCalc = {
-  STAGES: STAGES, OPEN: OPEN, TW_ORDER: TW_ORDER, MEASURES: MEASURES,
-  isOpen: isOpen, gmOf: gmOf, marginOf: marginOf, gapsOf: gapsOf,
+  STAGES: STAGES, OPEN: OPEN, ACTIVE: ACTIVE, CLOSED: CLOSED, TW_ORDER: TW_ORDER, MEASURES: MEASURES,
+  isOpen: isOpen, isActive: isActive, isClosed: isClosed, gmOf: gmOf, marginOf: marginOf, gapsOf: gapsOf,
   build: build, rankSellers: rankSellers, topDeals: topDeals, compact: compact, full: full, isoDay: isoDay
 };
 })(typeof window !== "undefined" ? window : globalThis);

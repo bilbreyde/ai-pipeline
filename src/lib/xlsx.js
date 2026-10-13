@@ -16,7 +16,7 @@ import { randomUUID } from "node:crypto";
 import { ConflictError, ImportError } from "./errors.js";
 import { cleanAccount, mapLead, mapStage, mapTw, parseSize } from "./import-mapping.js";
 import { mergeUpdate } from "./mutate.js";
-import { ID_PATTERN, STAGES, TW_STATUS, validateOpp } from "./validate.js";
+import { ID_PATTERN, OPEN_STAGES, STAGES, TW_STATUS, validateOpp } from "./validate.js";
 
 export const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 export const PIPELINE_SHEET = "Pipeline";
@@ -27,7 +27,6 @@ const NAVY = "FF003087";
 const SLATE = "FF5B6B8C";
 const WHITE = "FFFFFFFF";
 const MONEY = '"$"#,##0';
-const OPEN_STAGES = STAGES.filter((s) => s !== "Won" && s !== "Lost");
 const LEAD_CHOICES = ["Zones", "Thoughtworks"];
 
 // ---------------------------------------------------------------------------------------------
@@ -160,7 +159,7 @@ export async function buildWorkbook({ opps, settings, now = new Date() }) {
   as.getCell("B3").value = settings.defaultGm;
   as.getCell("C3").value = "A row's GM% override replaces this default.";
   as.getCell("B2").dataValidation = { type: "list", allowBlank: false, formulae: ['"price,cost"'] };
-  as.getCell("A5").value = "Open pipeline (everything except Won and Lost)";
+  as.getCell("A5").value = "Open pipeline (excludes Prospecting, Won, Lost and Unqualified)";
   as.getCell("A5").font = { bold: true, size: 13, color: { argb: NAVY } };
 
   const open = sorted.filter((o) => OPEN_STAGES.includes(o.stage));
@@ -175,7 +174,9 @@ export async function buildWorkbook({ opps, settings, now = new Date() }) {
     const r = 6 + i;
     as.getCell(r, 1).value = label;
     as.getCell(r, 2).value = {
-      formula: `SUMIFS(${range(key)},${stageRange},"<>Won",${stageRange},"<>Lost")`,
+      // SUMIFS has no "is one of", so sum each counted stage. Matches OPEN_STAGES exactly, so a blank or
+      // unknown stage typed in Excel stays out of the total the same way it would in the app.
+      formula: OPEN_STAGES.map((s) => `SUMIFS(${range(key)},${stageRange},"${s}")`).join("+"),
       result,
     };
     as.getCell(r, 2).numFmt = MONEY;

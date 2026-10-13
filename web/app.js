@@ -1,6 +1,6 @@
 (function(){
 "use strict";
-var STAGES=["Account planning","Identified","Discovery","Qualified","Proposal / RFP","Blocked","Won","Lost"];
+var STAGES=["Prospecting","Account planning","Identified","Discovery","Qualified","Proposal / RFP","Blocked","Won","Lost","Unqualified"];
 var OPEN=["Account planning","Identified","Discovery","Qualified","Proposal / RFP","Blocked"];
 var SEGMENTS=["ITS","ENT","MM","Healthcare","SLED / Public Sector Utility"];
 var LEADS=["Zones","Thoughtworks"];
@@ -12,7 +12,7 @@ var COLS=[
   {k:"next",l:"Next step",ns:1},{k:"close",l:"Close"},{k:"updated",l:"Updated"}
 ];
 var S={canWrite:true,me:"",authenticated:false,bulk:false,ai:false,aiWhy:"",aiDemo:false,tab:"pipeline",loaded:false,offline:false,err:"",opps:[],settings:clone(DEFAULTS),
-  sellers:{},sort:{k:"margin",d:"desc"},f:{q:"",stage:"all",lead:"",seg:"",gaps:false},editing:null,delArmed:false};
+  sellers:{},sort:{k:"margin",d:"desc"},f:{q:"",stage:"all",lead:"",seg:"",gaps:false,closed:loadShowClosed()},editing:null,delArmed:false};
 var chains={};
 
 function $(id){return document.getElementById(id)}
@@ -20,6 +20,12 @@ function clone(o){return JSON.parse(JSON.stringify(o))}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 var DC=window.DashCalc;
 function isOpen(o){return DC.isOpen(o)}
+function isActive(o){return DC.isActive(o)}
+function isClosed(o){return DC.isClosed(o)}
+/* Remembered per browser only. Storage can be missing or throw (private mode), so the default, off, always works. */
+var CLOSED_KEY="pipeline.showClosed";
+function loadShowClosed(){try{return localStorage.getItem(CLOSED_KEY)==="1"}catch(e){return false}}
+function saveShowClosed(v){try{if(v)localStorage.setItem(CLOSED_KEY,"1");else localStorage.removeItem(CLOSED_KEY)}catch(e){}}
 function full(n){return n==null?"":"$"+Math.round(n).toLocaleString("en-US")}
 function compact(n){
   if(n==null)return "–";
@@ -110,8 +116,11 @@ function saveSettings(){
 function filtered(){
   var f=S.f,q=f.q.trim().toLowerCase();
   var rows=S.opps.filter(function(o){
-    if(f.stage==="open"&&!isOpen(o))return false;
+    if(f.stage==="open"&&!isActive(o))return false;
     if(f.stage!=="all"&&f.stage!=="open"&&o.stage!==f.stage)return false;
+    // Closed rows are hidden in the page only, never on the server. Picking a closed stage in the
+    // stage filter shows it anyway, since that is an explicit ask for exactly those rows.
+    if(!f.closed&&isClosed(o)&&f.stage!==o.stage)return false;
     if(f.lead&&(o.lead||"")!==(f.lead==="_none"?"":f.lead))return false;
     if(f.seg&&(o.segment||"")!==f.seg)return false;
     if(f.gaps&&!gapsOf(o).length)return false;
@@ -125,7 +134,7 @@ function filtered(){
       case "stage":return STAGES.indexOf(o.stage);
       case "seller":return (o.seller||"").toLowerCase();
       case "size":return o.size==null?null:o.size;
-      case "margin":return marginOf(o);
+      case "margin":return o.stage==="Prospecting"?null:marginOf(o);
       case "next":return (o.nextStep||"").toLowerCase();
       case "close":return o.closeDate||null;
       case "updated":return o.updatedAt||null;
@@ -148,12 +157,13 @@ function renderBand(){
   sized.forEach(function(o){size+=o.size;mar+=marginOf(o)||0});
   var noSeller=open.filter(function(o){return !o.seller}).length;
   var unsized=open.length-sized.length;
-  var gapRows=open.filter(function(o){return gapsOf(o).length}).length;
+  var active=S.opps.filter(isActive),prospects=active.length-open.length;
+  var gapRows=active.filter(function(o){return gapsOf(o).length}).length;
   var basisTxt=S.settings.marginBasis==="cost"?"cost basis":"sell price basis";
   $("band").innerHTML=
-    '<div class="metric"><span class="m-label">Open deal size</span><span class="m-val">'+compact(size)+'</span><span class="m-note">'+open.length+' open opportunities</span></div>'+
+    '<div class="metric"><span class="m-label">Open deal size</span><span class="m-val">'+compact(size)+'</span><span class="m-note">'+open.length+' open opportunities'+(prospects?', '+prospects+' prospecting not counted':'')+'</span></div>'+
     '<div class="metric"><span class="m-label">Est. margin</span><span class="m-val">'+compact(mar)+'</span><span class="m-note">at '+S.settings.defaultGm+'% GM default, '+basisTxt+'</span></div>'+
-    '<div class="metric'+(gapRows?' flag':'')+'"><span class="m-label">Rows with gaps</span><span class="m-val">'+gapRows+' of '+open.length+'</span><span class="m-note"><b>'+unsized+'</b> without a size, <b>'+noSeller+'</b> without a seller</span></div>';
+    '<div class="metric'+(gapRows?' flag':'')+'"><span class="m-label">Rows with gaps</span><span class="m-val">'+gapRows+' of '+active.length+'</span><span class="m-note"><b>'+unsized+'</b> without a size, <b>'+noSeller+'</b> without a seller</span></div>';
 }
 function renderInsights(){
   var open=S.opps.filter(isOpen);
@@ -210,19 +220,22 @@ function renderTable(){
       var tags=gaps.map(function(g){return '<span class="tag">'+g+'</span>'}).join("");
       if(o.tw==="Engaged"||o.tw==="Strong fit"||o.tw==="Target")tags+='<span class="tag tw">TW '+esc(o.tw.toLowerCase())+'</span>';
       if(o.activityCount)tags+='<span class="tag mtg" title="Meeting history, last on '+esc(new Date(o.lastActivityAt).toLocaleDateString("en-US",{month:"short",day:"numeric"}))+'">'+o.activityCount+(o.activityCount===1?" meeting":" meetings")+'</span>';
-      var cd=parseDate(o.closeDate),late=cd&&isOpen(o)&&cd<today;
+      var cd=parseDate(o.closeDate),late=cd&&isActive(o)&&cd<today;
       var age=daysAgo(o.updatedAt);
       // Three escalating tiers on how long an open opportunity has gone untouched: a light flag at a week,
       // a harder one at two weeks, and a flashing one past three, so a deal nobody has looked at stands out
-      // in the table without having to sort by Updated. Closed deals (Won/Lost) are never flagged: nobody
-      // needs to be nagged to update something that's already done.
-      var staleTier=(age!=null&&isOpen(o))?(age>=21?3:age>=14?2:age>=7?1:0):0;
+      // in the table without having to sort by Updated. Prospecting is flagged like any open deal even though
+      // it is never counted. Closed deals (Won/Lost/Unqualified) are never flagged: nobody needs to be nagged
+      // to update something that's already done.
+      var staleTier=(age!=null&&isActive(o))?(age>=21?3:age>=14?2:age>=7?1:0):0;
       var staleCls=["","stale-7","stale-14","stale-21"][staleTier];
       var staleTitle=staleTier?" title=\"Not updated in "+age+" days\"":"";
       var who=(o.updatedBy||"").split("@")[0];
       var updTxt=age==null?"":(age<=0?"Today":age===1?"Yesterday":age+"d ago")+(who?" · "+esc(who.split(" ")[0]):"");
       var gmNote=o.gmPct!=null?' <span class="tag tw" title="GM% override">'+gmOf(o)+'% GM</span>':"";
-      return '<tr class="'+(isOpen(o)?"":"closed")+'">'+
+      // Prospecting keeps its size, but its margin is never a figure anywhere, so it can't read as pipeline.
+      var marCell=o.stage==="Prospecting"?'<span class="na">not counted</span>':m==null?'<span class="na">–</span>':full(m);
+      return '<tr class="'+(isActive(o)?"":"closed")+'">'+
         '<td><button class="acct" type="button" data-open="'+esc(o.id)+'">'+esc(o.account)+'</button>'+
           (o.oppNumber?'<span class="oppnum">'+esc(o.oppNumber)+'</span>':"")+
           (o.opportunity?'<div class="opp">'+esc(o.opportunity)+'</div>':"")+
@@ -230,7 +243,7 @@ function renderTable(){
         '<td>'+stagePill(o)+'</td>'+
         '<td class="who"><b>'+(o.seller?esc(o.seller):'<span style="color:var(--ink-3);font-weight:400">Unassigned</span>')+'</b><span>'+esc([o.lead?o.lead+" lead":"",o.segment||""].filter(Boolean).join(" · "))+'</span></td>'+
         '<td class="num">'+(o.size==null?'<span class="na">–</span>':full(o.size))+'</td>'+
-        '<td class="num">'+(m==null?'<span class="na">–</span>':full(m))+'</td>'+
+        '<td class="num">'+marCell+'</td>'+
         '<td class="next"><div title="'+esc(o.nextStep||"")+'">'+esc(o.nextStep||"")+'</div></td>'+
         '<td class="date'+(late?" late":"")+'">'+(cd?fmtDate(cd)+(late?" (overdue)":""):'<span class="na">–</span>')+'</td>'+
         '<td class="upd">'+(staleCls?'<span class="'+staleCls+'"'+staleTitle+'>'+updTxt+'</span>':updTxt)+'</td></tr>';
@@ -239,7 +252,8 @@ function renderTable(){
   var ts=0,tm=0,n=0;
   rows.forEach(function(o){var m=marginOf(o);if(o.size!=null&&isOpen(o)){ts+=o.size}if(m!=null&&isOpen(o)){tm+=m}if(isOpen(o))n++});
   $("tfoot").innerHTML=rows.length?'<tr><td class="lbl" colspan="3">Total, open opportunities shown ('+n+')</td><td class="num">'+full(ts)+'</td><td class="num">'+full(tm)+'</td><td colspan="3"></td></tr>':"";
-  $("count").textContent="Showing "+rows.length+" of "+S.opps.length;
+  var hidden=S.f.closed?0:S.opps.filter(function(o){return isClosed(o)&&S.f.stage!==o.stage}).length;
+  $("count").textContent="Showing "+rows.length+" of "+S.opps.length+(hidden?" ("+hidden+" closed hidden)":"");
   var sel=$("sellers"),set={};S.opps.forEach(function(o){if(o.seller)set[o.seller]=1});
   for(var sn in S.sellers){if(Object.prototype.hasOwnProperty.call(S.sellers,sn))set[sn]=1}
   sel.innerHTML=Object.keys(set).sort().map(function(s){return '<option value="'+esc(s)+'">'}).join("");
@@ -373,6 +387,7 @@ function updatePreview(){
   if(bad){$("preview").textContent="Deal size needs to be a number, like 250000 or 250k.";return}
   d.size=d.size==null?null:d.size;
   var m=marginOf(d);
+  if(d.stage==="Prospecting"){$("preview").textContent="Prospecting is not counted in any total, so it has no margin. Its size is still saved.";return}
   $("preview").innerHTML=m==null?"Add a deal size to see margin.":
     'Est. margin <b>'+full(m)+'</b> at '+gmOf(d)+'% GM.';
 }
@@ -420,10 +435,10 @@ function loadHistory(o){
 /* Summarizes exactly what the tracker has on file, including "Not on file" for the fields we ask
    sellers to fill in most often, so a stale or blank field gets fixed instead of silently staying
    wrong. Segment, lead and Opportunity # are left out when blank; they are not something we chase.
-   At Account planning no size or close is expected (dash-calc.js does not count it as a gap), so those
-   two are shown only when set, never chased. The opening line asks to fill gaps only when there are some. */
+   At Prospecting and Account planning no size or close is expected (dash-calc.js does not count it as a
+   gap), so those two are shown only when set, never chased. The opening line asks to fill gaps only when there are some. */
 function updateMailBody(d){
-  var NA="Not on file",planning=d.stage==="Account planning",body=[],missing=false;
+  var NA="Not on file",planning=d.stage==="Account planning"||d.stage==="Prospecting",body=[],missing=false;
   function field(label,value,chase){
     if(value)body.push(label+": "+value);
     else if(chase){body.push(label+": "+NA);missing=true}
@@ -630,6 +645,8 @@ function bind(){
   $("fLead").addEventListener("change",function(e){S.f.lead=e.target.value;renderTable()});
   $("fSeg").addEventListener("change",function(e){S.f.seg=e.target.value;renderTable()});
   $("fGaps").addEventListener("change",function(e){S.f.gaps=e.target.checked;renderTable()});
+  $("fClosed").checked=S.f.closed;
+  $("fClosed").addEventListener("change",function(e){S.f.closed=e.target.checked;saveShowClosed(S.f.closed);renderTable()});
 
   $("thead").addEventListener("click",function(e){
     var b=e.target.closest("[data-sort]");if(!b)return;

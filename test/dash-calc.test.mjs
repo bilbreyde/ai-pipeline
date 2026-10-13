@@ -64,6 +64,56 @@ test("Account planning has no margin and its missing size is not a data gap, unl
   assert.equal(d.byStage[0].size, 0);
 });
 
+test("stage categories: OPEN is counted, ACTIVE adds Prospecting first, CLOSED adds Unqualified after Lost", () => {
+  assert.equal(C.STAGES.join(), "Prospecting,Account planning,Identified,Discovery,Qualified,Proposal / RFP,Blocked,Won,Lost,Unqualified");
+  assert.equal(C.ACTIVE.join(), ["Prospecting"].concat(plain(C.OPEN)).join());
+  assert.equal(C.CLOSED.join(), "Won,Lost,Unqualified");
+  assert.equal(C.STAGES.length, C.ACTIVE.length + C.CLOSED.length);
+  const p = opp({ stage: "Prospecting" }), u = opp({ stage: "Unqualified" });
+  assert.equal(C.isOpen(p), false); assert.equal(C.isActive(p), true); assert.equal(C.isClosed(p), false);
+  assert.equal(C.isOpen(u), false); assert.equal(C.isActive(u), false); assert.equal(C.isClosed(u), true);
+});
+
+test("Prospecting is in no money rollup, even with a size", () => {
+  const base = [opp({ account: "Q", size: 100000, stage: "Qualified", seller: "Sam", lead: "Zones", tw: "Engaged", closeDate: "2026-10-15" })];
+  const withP = base.concat([opp({ account: "P", size: 900000, stage: "Prospecting", seller: "Sam", lead: "Zones", tw: "Engaged", closeDate: "2026-10-15" })]);
+  const a = build(base), b = build(withP);
+  for (const k of ["open", "won", "lost"]) assert.deepEqual(plain(b.kpi[k]), plain(a.kpi[k]), k);
+  assert.equal(b.kpi.blendedGm, a.kpi.blendedGm);
+  assert.deepEqual(plain(b.byStage), plain(a.byStage));
+  assert.ok(!b.byStage.some((g) => g.key === "Prospecting"));
+  assert.deepEqual(plain(b.bySeller), plain(a.bySeller));
+  assert.deepEqual(plain(b.byLead), plain(a.byLead));
+  assert.deepEqual(plain(b.byTw), plain(a.byTw));
+  assert.deepEqual(plain(b.timeline), plain(a.timeline));
+  assert.deepEqual(plain(C.topDeals(b.openDeals, ST, "size", 10)).map((r) => r.account), ["Q"]);
+  assert.equal(b.prospecting, 1);
+});
+
+test("Prospecting gets staleness and the seller and next step gaps, but never No size", () => {
+  const p = opp({ account: "P", stage: "Prospecting", size: null, seller: "", nextStep: "", updatedAt: "2026-08-01T00:00:00Z" });
+  assert.deepEqual(plain(C.gapsOf(p)), ["No seller", "No next step"]);
+  assert.deepEqual(plain(C.gapsOf(opp({ stage: "Prospecting" }))), []);
+  const d = build([p]);
+  assert.deepEqual(plain(d.gaps), { open: 1, noSize: 0, noSeller: 1, noNext: 1, overdue: 0, stale: 1, anyGap: 1 });
+  assert.equal(d.kpi.open.n, 0);
+});
+
+test("Unqualified is in no pipeline total, no lost total, and gets no gaps or staleness", () => {
+  const list = [
+    opp({ account: "Q", size: 100000, stage: "Qualified" }),
+    opp({ account: "L", size: 50000, stage: "Lost" }),
+  ];
+  const u = opp({ account: "U", size: 400000, stage: "Unqualified", seller: "", nextStep: "", updatedAt: "2026-01-01T00:00:00Z" });
+  const a = build(list), b = build(list.concat([u]));
+  assert.deepEqual(plain(b.kpi), plain(a.kpi));
+  assert.equal(b.kpi.lost.n, 1);
+  assert.equal(b.kpi.lost.size, 50000);
+  assert.deepEqual(plain(b.byStage), plain(a.byStage));
+  assert.deepEqual(plain(b.gaps), plain(a.gaps));
+  assert.deepEqual(plain(C.gapsOf(u)), []);
+});
+
 test("lead and segment filters scope every number", () => {
   const list = [
     opp({ account: "A", size: 100000, lead: "Zones", segment: "ENT" }),

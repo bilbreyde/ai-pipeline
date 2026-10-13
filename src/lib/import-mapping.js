@@ -8,6 +8,8 @@ export function mapStage(status) {
   if (/\brfp\b|proposal/.test(s)) return "Proposal / RFP";
   if (/\bwon\b/.test(s)) return "Won";
   if (/\blost\b/.test(s)) return "Lost";
+  // Before the "qualified" rule, which would otherwise read "unqualified" or "not qualified" as Qualified.
+  if (/unqualified|disqualified|not qualified/.test(s)) return "Unqualified";
   if (/qualified|active/.test(s)) return "Qualified";
   if (/early|identified/.test(s)) return "Identified";
   return "Discovery";

@@ -7,7 +7,7 @@ var A=window.PipelineApp;
 if(!A)return;
 var $=function(id){return document.getElementById(id)};
 var esc=A.esc;
-var STAGES=["Account planning","Identified","Discovery","Qualified","Proposal / RFP","Blocked","Won","Lost"];
+var STAGES=["Prospecting","Account planning","Identified","Discovery","Qualified","Proposal / RFP","Blocked","Won","Lost","Unqualified"];
 var TW=["Engaged","Strong fit","Target","Potential","Not indicated","Zones only"];
 var LEADS=["Zones","Thoughtworks"];
 var SEGMENTS=["ITS","ENT","MM","Healthcare","SLED / Public Sector Utility"];
@@ -150,7 +150,7 @@ function renderReview(){
     html+='<p class="tm-h">'+(changes.length?(isNew?"Fields":"Proposed changes"):"No field changes")+'</p>';
     changes.forEach(function(c,i){
       var on=c.manual||c.quoteFound;
-      var flag=(c.field==="stage"&&(c.to==="Won"||c.to==="Lost"))?'<span class="tm-flag">Closes the deal</span>':"";
+      var flag=(c.field==="stage"&&(c.to==="Won"||c.to==="Lost"||c.to==="Unqualified"))?'<span class="tm-flag">Closes the deal</span>':"";
       html+='<div class="tm-chg'+(on?"":" off")+'" data-i="'+i+'">'+
         '<label class="tm-head"><input type="checkbox" class="tm-on"'+(on?" checked":"")+(c.field==="account"&&isNew?" checked disabled":"")+'> <b>'+esc(c.label)+'</b>'+flag+'</label>'+
         '<div class="tm-cur">'+(isNew?"New":"Now: "+esc(shown(c.field,c.from,false)))+'</div>'+

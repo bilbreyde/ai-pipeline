@@ -146,7 +146,7 @@ Deployments are named after the model (`transcripts-gpt-5-4-mini`), so the name 
 
 ## Request update from the seller
 
-Open an opportunity and click **Request update**. If the seller has an email on file, a draft opens in your own mail client, addressed to them, with a summary of everything the tracker has on that deal: account, opportunity number (if set), stage, deal size, expected close, next step, and segment or lead if set. Any of deal size, expected close or next step that is blank is shown as "Not on file", and the opening line asks the seller to fill those in, so a stale or missing field gets fixed instead of quietly staying wrong. When nothing is missing, it just asks them to confirm the summary. At Account planning no size or close date is expected, so those two appear only if set and are never chased. You review the draft and send it yourself, from your own mailbox. Nothing here sends mail automatically and nothing is queued: the button only builds a `mailto:` link.
+Open an opportunity and click **Request update**. If the seller has an email on file, a draft opens in your own mail client, addressed to them, with a summary of everything the tracker has on that deal: account, opportunity number (if set), stage, deal size, expected close, next step, and segment or lead if set. Any of deal size, expected close or next step that is blank is shown as "Not on file", and the opening line asks the seller to fill those in, so a stale or missing field gets fixed instead of quietly staying wrong. When nothing is missing, it just asks them to confirm the summary. At Prospecting and Account planning no size or close date is expected, so those two appear only if set and are never chased. You review the draft and send it yourself, from your own mailbox. Nothing here sends mail automatically and nothing is queued: the button only builds a `mailto:` link.
 
 The first time you use it for a given seller, you are asked for their email once. It is saved to a small seller directory (name to email), not copied onto every opportunity row, so the next request for that seller, on any deal, needs no prompt. The Seller field itself stays free text; the match against the directory ignores case, so "Avery" and "avery" are the same seller.
 
@@ -179,6 +179,12 @@ Estimated margin = deal size × GM%, where GM% is a default (30%) with an option
 Resale heavy deals (hardware, licences) do not carry consulting margins. Set a real GM% on those rows, or the total is fiction. The page warns when one deal is over a third of the margin.
 
 **Account planning** is the earliest stage, before Identified. It tracks an account you plan to approach about AI, before there is a real opportunity. No size or margin is expected there, so a blank size on an Account planning row is not flagged as a data gap the way it would be at every later stage. It still counts as an open deal, and it still shows up in the Dashboard's by stage chart, in gray alongside Blocked, since neither has a place in the "darker means later in the sales process" order.
+
+**Prospecting** comes first, before Account planning. It is exploratory: the row is active, so it gets the Updated column's staleness flags and the No seller and No next step tags, but it is never counted. A size can be entered and is saved, but it is left out of every deal size and margin total, the Dashboard charts and the Excel export's totals, and the table shows its Est. margin as "not counted". A blank size is not a data gap.
+
+**Unqualified** is a closed stage after Lost, for a deal that never qualified. It is not a loss: it is in no pipeline total and in no Lost figure, and it gets no staleness flag.
+
+The table hides Won, Lost and Unqualified rows by default. Tick **Show closed** next to Data gaps only to see them; your browser remembers the choice. Picking a closed stage in the stage filter shows those rows either way. Nothing is deleted or filtered on the server.
 
 ## Before real customer data
 
